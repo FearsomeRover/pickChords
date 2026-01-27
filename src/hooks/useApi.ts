@@ -1,6 +1,8 @@
 import { useAuth } from './useAuth'
 
-const API_URL = import.meta.env.VITE_API_URL || ''
+// Use Vite's base URL (set via BASE_PATH) for API calls
+const BASE_URL = import.meta.env.BASE_URL || '/'
+const API_URL = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL
 
 export function useApi() {
   const { token } = useAuth()
