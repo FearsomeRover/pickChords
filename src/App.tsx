@@ -6,7 +6,7 @@ import ChordDiagram from './components/ChordDiagram'
 import AuthModal from './components/AuthModal'
 import TabNav, { TabType } from './components/TabNav'
 import SongCard from './components/SongCard'
-import SongModal from './components/SongModal'
+import SongPage from './components/SongPage'
 import AddSongModal from './components/AddSongModal'
 import TagChip from './components/TagChip'
 
@@ -34,9 +34,11 @@ function App() {
   const [chordForm, setChordForm] = useState<{
     name: string
     strings: StringData[]
+    rawInputs: string[]
   }>({
     name: '',
     strings: Array(6).fill({ fret: 0 }),
+    rawInputs: Array(6).fill('0'),
   })
 
   const fetchChords = useCallback(async (search = '') => {
@@ -121,8 +123,10 @@ function App() {
 
   const handleStringChange = (index: number, value: string) => {
     const newStrings = [...chordForm.strings]
+    const newRawInputs = [...chordForm.rawInputs]
     newStrings[index] = parseStringInput(value)
-    setChordForm({ ...chordForm, strings: newStrings })
+    newRawInputs[index] = value
+    setChordForm({ ...chordForm, strings: newStrings, rawInputs: newRawInputs })
   }
 
   const getStringDisplayValue = (stringData: StringData): string => {
@@ -134,20 +138,24 @@ function App() {
 
   const openAddChordModal = () => {
     setEditingChordId(null)
-    setChordForm({ name: '', strings: Array(6).fill({ fret: 0 }) })
+    setChordForm({ name: '', strings: Array(6).fill({ fret: 0 }), rawInputs: Array(6).fill('0') })
     setShowChordModal(true)
   }
 
   const openEditChordModal = (chord: Chord) => {
     setEditingChordId(chord.id)
-    setChordForm({ name: chord.name, strings: [...chord.strings] })
+    setChordForm({
+      name: chord.name,
+      strings: [...chord.strings],
+      rawInputs: chord.strings.map(getStringDisplayValue),
+    })
     setShowChordModal(true)
   }
 
   const closeChordModal = () => {
     setShowChordModal(false)
     setEditingChordId(null)
-    setChordForm({ name: '', strings: Array(6).fill({ fret: 0 }) })
+    setChordForm({ name: '', strings: Array(6).fill({ fret: 0 }), rawInputs: Array(6).fill('0') })
   }
 
   const handleSaveChord = async () => {
@@ -223,6 +231,25 @@ function App() {
     return (
       <div className="app">
         <div className="loading">Loading...</div>
+      </div>
+    )
+  }
+
+  // Show song page when a song is selected
+  if (selectedSong) {
+    return (
+      <div className="app">
+        <SongPage
+          song={selectedSong}
+          onBack={() => setSelectedSong(null)}
+          onDelete={() => handleDeleteSong(selectedSong.id)}
+          onUpdate={(updatedSong) => {
+            setSelectedSong(updatedSong)
+            fetchSongs(searchTerm, selectedTagId, activeTab === 'favorites')
+          }}
+          onFavorite={user ? () => handleToggleFavorite(selectedSong) : undefined}
+          isFavorite={selectedSong.is_favorite}
+        />
       </div>
     )
   }
@@ -382,7 +409,7 @@ function App() {
                     <input
                       type="text"
                       placeholder="0"
-                      value={getStringDisplayValue(chordForm.strings[i])}
+                      value={chordForm.rawInputs[i]}
                       onChange={(e) => handleStringChange(i, e.target.value)}
                     />
                   </div>
@@ -394,7 +421,7 @@ function App() {
             </div>
 
             <div style={{ marginTop: '20px', marginBottom: '20px' }}>
-              <p style={{ marginBottom: '10px', color: '#888' }}>Preview:</p>
+              <p className="help-text" style={{ marginBottom: '10px', marginTop: '0' }}>Preview:</p>
               <div style={{ display: 'flex', justifyContent: 'center' }}>
                 <ChordDiagram chord={chordForm} />
               </div>
@@ -416,16 +443,6 @@ function App() {
         <AddSongModal
           onClose={() => setShowAddSongModal(false)}
           onAdd={() => fetchSongs(searchTerm, selectedTagId, activeTab === 'favorites')}
-        />
-      )}
-
-      {selectedSong && (
-        <SongModal
-          song={selectedSong}
-          onClose={() => setSelectedSong(null)}
-          onDelete={() => handleDeleteSong(selectedSong.id)}
-          onFavorite={user ? () => handleToggleFavorite(selectedSong) : undefined}
-          isFavorite={selectedSong.is_favorite}
         />
       )}
     </div>

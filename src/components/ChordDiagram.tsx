@@ -6,6 +6,13 @@ interface ChordDiagramProps {
   height?: number;
 }
 
+interface Barre {
+  fret: number
+  finger: number
+  fromString: number
+  toString: number
+}
+
 export default function ChordDiagram({ chord, width = 160, height = 200 }: ChordDiagramProps) {
   const padding = { top: 35, left: 20, right: 20, bottom: 15 }
   const numStrings = 6
@@ -20,18 +27,64 @@ export default function ChordDiagram({ chord, width = 160, height = 200 }: Chord
   const getStringX = (stringIndex: number) => padding.left + stringIndex * stringSpacing
   const getFretY = (fretIndex: number) => padding.top + fretIndex * fretSpacing
 
-  const backgroundColor = '#1a1a1a'
-  const lineColor = '#666'
-  const fingerColor = '#5b8bd4'
-  const textColor = '#fff'
-  const mutedColor = '#888'
+  const backgroundColor = '#0e402d'
+  const lineColor = '#5a6650'
+  const fingerColor = '#9fcc2e'
+  const textColor = '#000000'
+  const mutedColor = '#5a6650'
 
   const startFret = chord.start_fret || 1
+
+  // Detect barres: same finger on same fret across multiple strings
+  const detectBarres = (): Barre[] => {
+    const barres: Barre[] = []
+    const fingerPositions: Map<string, number[]> = new Map()
+
+    // Group strings by finger+fret combination
+    chord.strings.forEach((string, i) => {
+      if (string.fret !== 'x' && string.fret !== 0 && string.finger) {
+        const key = `${string.finger}-${string.fret}`
+        if (!fingerPositions.has(key)) {
+          fingerPositions.set(key, [])
+        }
+        fingerPositions.get(key)!.push(i)
+      }
+    })
+
+    // Create barre spanning from first to last string with same finger+fret
+    fingerPositions.forEach((strings, key) => {
+      if (strings.length >= 2) {
+        const [finger, fret] = key.split('-').map(Number)
+        const minString = Math.min(...strings)
+        const maxString = Math.max(...strings)
+
+        barres.push({
+          fret,
+          finger,
+          fromString: minString,
+          toString: maxString,
+        })
+      }
+    })
+
+    return barres
+  }
+
+  const barres = detectBarres()
+
+  // Check if a string position is covered by a barre
+  const isInBarre = (stringIndex: number, fret: number): boolean => {
+    return barres.some(
+      b => b.fret === fret && stringIndex >= b.fromString && stringIndex <= b.toString
+    )
+  }
+
+  const radius = Math.min(14, stringSpacing * 0.4, fretSpacing * 0.35)
 
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
       {/* Background */}
-      <rect width={width} height={height} fill={backgroundColor} />
+      <rect width={width} height={height} fill={backgroundColor} rx={4} />
 
       {/* Nut (thick line at top if starting from fret 1) */}
       {startFret === 1 && (
@@ -48,10 +101,10 @@ export default function ChordDiagram({ chord, width = 160, height = 200 }: Chord
       {/* Start fret indicator for barre chords */}
       {startFret > 1 && (
         <text
-          x={padding.left - 15}
-          y={padding.top + fretSpacing / 2 + 5}
-          fill={textColor}
-          fontSize="12"
+          x={padding.left - 12}
+          y={padding.top + fretSpacing / 2 + 4}
+          fill={mutedColor}
+          fontSize={Math.max(10, width * 0.07)}
           textAnchor="middle"
         >
           {startFret}
@@ -84,13 +137,47 @@ export default function ChordDiagram({ chord, width = 160, height = 200 }: Chord
         />
       ))}
 
+      {/* Draw barres */}
+      {barres.map((barre, i) => {
+        const fretNum = startFret > 1 ? barre.fret - startFret + 1 : barre.fret
+        const y = getFretY(fretNum) - fretSpacing / 2
+        const x1 = getStringX(barre.fromString)
+        const x2 = getStringX(barre.toString)
+        const barreWidth = x2 - x1
+        const barreHeight = radius * 2
+
+        return (
+          <g key={`barre-${i}`}>
+            <rect
+              x={x1 - radius}
+              y={y - radius}
+              width={barreWidth + radius * 2}
+              height={barreHeight}
+              rx={radius}
+              ry={radius}
+              fill={fingerColor}
+            />
+            <text
+              x={x1 + barreWidth / 2}
+              y={y + radius * 0.35}
+              fill={textColor}
+              fontSize={radius}
+              fontWeight="bold"
+              textAnchor="middle"
+            >
+              {barre.finger}
+            </text>
+          </g>
+        )
+      })}
+
       {/* String markers (X, O, and finger positions) */}
       {chord.strings.map((string, i) => {
         const x = getStringX(i)
 
         if (string.fret === 'x') {
           // Muted string - draw X
-          const size = 8
+          const size = Math.min(8, radius * 0.6)
           const y = padding.top - 18
           return (
             <g key={`marker-${i}`}>
@@ -123,7 +210,7 @@ export default function ChordDiagram({ chord, width = 160, height = 200 }: Chord
               key={`marker-${i}`}
               cx={x}
               cy={padding.top - 18}
-              r={8}
+              r={Math.min(8, radius * 0.6)}
               fill="none"
               stroke={mutedColor}
               strokeWidth={2}
@@ -131,12 +218,16 @@ export default function ChordDiagram({ chord, width = 160, height = 200 }: Chord
           )
         }
 
+        // Skip if this position is part of a barre
+        if (isInBarre(i, string.fret)) {
+          return null
+        }
+
         // Fretted note - draw filled circle with finger number
         const fretNum = startFret > 1
           ? string.fret - startFret + 1
           : string.fret
         const y = getFretY(fretNum) - fretSpacing / 2
-        const radius = 14
 
         return (
           <g key={`marker-${i}`}>
@@ -149,9 +240,9 @@ export default function ChordDiagram({ chord, width = 160, height = 200 }: Chord
             {string.finger && (
               <text
                 x={x}
-                y={y + 5}
+                y={y + radius * 0.35}
                 fill={textColor}
-                fontSize="14"
+                fontSize={radius}
                 fontWeight="bold"
                 textAnchor="middle"
               >
