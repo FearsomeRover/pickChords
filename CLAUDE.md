@@ -4,23 +4,26 @@ A personal guitar chord library web application with songs, tags, and favorites.
 
 ## Project Status
 
-**Current State:** Migrated to NestJS + TypeScript with Songs Feature
+**Current State:** Deployed and running at https://bujdi.sch.bme.hu/pickChords/
 
 ### Completed
 - NestJS backend with TypeScript
 - React TypeScript frontend with Vite
 - PostgreSQL database with JSONB storage
 - User authentication (JWT)
-- Chords CRUD with SVG diagrams
+- Chords CRUD with SVG diagrams (add, edit, delete)
 - Songs with associated chords and tags
 - Tags with custom colors
 - Favorites system (requires login)
 - Search and filter functionality
 - Responsive dark-themed UI
+- Docker containerization with multi-stage build
+- Subpath deployment support (BASE_PATH)
+- Nginx reverse proxy configuration
 
 ### Architecture
 ```
-Frontend (React + Vite + TypeScript)  →  NestJS API  →  PostgreSQL
+Nginx  →  Docker (Frontend + NestJS API)  →  PostgreSQL
 ```
 
 ## Tech Stack
@@ -29,6 +32,7 @@ Frontend (React + Vite + TypeScript)  →  NestJS API  →  PostgreSQL
 - **Database:** PostgreSQL with JSONB
 - **Auth:** JWT with Passport
 - **Styling:** Plain CSS (dark theme)
+- **Deployment:** Docker, Nginx
 
 ## Project Structure
 ```
@@ -79,8 +83,8 @@ src/                            # React TypeScript Frontend
   name: "Wonderwall",
   artist: "Oasis",
   notes: "Capo 2nd fret",
-  chord_ids: [1, 3, 5],  // References chord IDs
-  tag_ids: [1, 2],       // References tag IDs
+  chord_ids: [1, 3, 5],
+  tag_ids: [1, 2],
   chords: [...],         // Expanded when fetched
   tags: [...],           // Expanded when fetched
   is_favorite: true      // When user is logged in
@@ -145,46 +149,78 @@ src/                            # React TypeScript Frontend
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and configure:
-
+### Server (.env)
 ```
 DATABASE_URL=postgresql://user:password@localhost:5432/pickchords
 PORT=3000
 JWT_SECRET=your-secret-key-here
 ```
 
-## Setup (Local Development)
+### Frontend (.env.local for local dev)
+```
+VITE_API_URL=https://bujdi.sch.bme.hu/pickChords
+```
 
-1. Install frontend dependencies: `npm install`
-2. Install backend dependencies: `cd server && npm install`
-3. Create `.env` file from `.env.example`
-4. Start PostgreSQL database
-5. Run `npm run server` (backend) and `npm run dev` (frontend)
+## Local Development
+
+1. Install dependencies:
+   ```bash
+   npm install
+   cd server && npm install
+   ```
+
+2. For frontend only (connecting to production API):
+   ```bash
+   # Create .env.local with VITE_API_URL=https://bujdi.sch.bme.hu/pickChords
+   npm run dev
+   ```
+
+3. For full local stack:
+   ```bash
+   # Start PostgreSQL, create .env with DATABASE_URL
+   npm run server    # Terminal 1: backend on :3000
+   npm run dev       # Terminal 2: frontend on :5173
+   ```
 
 ## Docker Deployment
 
-### Quick Start (with bundled PostgreSQL)
+### Subpath deployment (e.g., /pickChords/)
 ```bash
-docker compose up -d
-```
-App will be available at http://localhost:3000
-
-### Production (with external database)
-1. Create a `.env` file:
-```
-DATABASE_URL=postgresql://user:password@your-db-host:5432/pickchords
-JWT_SECRET=your-secure-secret-key
-PORT=3000
+BASE_PATH=/pickChords/ docker compose up -d --build
 ```
 
-2. Run with production compose:
-```bash
-docker compose -f docker-compose.prod.yml up -d
+### Nginx configuration
+```nginx
+location /pickChords/ {
+    proxy_pass http://localhost:8080/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
 ```
 
-### Build image only
+### Server setup
 ```bash
-docker build -t pickchords .
+# Create user
+sudo useradd -r -s /bin/bash -m -d /opt/pickchords pickchords
+sudo usermod -aG docker pickchords
+
+# Clone and deploy
+sudo -u pickchords git clone https://github.com/FearsomeRover/pickChords.git /opt/pickchords/app
+cd /opt/pickchords/app
+sudo -u pickchords tee .env << EOF
+JWT_SECRET=$(openssl rand -base64 32)
+EOF
+BASE_PATH=/pickChords/ sudo -u pickchords docker compose up -d --build
+```
+
+### Update deployment
+```bash
+cd /opt/pickchords/app
+git pull
+BASE_PATH=/pickChords/ docker compose up -d --build
 ```
 
 ## Future Plans
@@ -197,8 +233,9 @@ docker build -t pickchords .
 - [ ] Audio playback of chord (Web Audio API)
 - [ ] Chord progressions / song builder
 - [ ] Print-friendly chord sheets
+- [ ] Start fret selector in chord editor
 
 ### Technical Improvements
 - [ ] Add unit tests
 - [ ] Add error boundaries in React
-- [x] Docker containerization
+- [ ] Add loading states/skeletons
