@@ -205,6 +205,18 @@ header p {
   margin-bottom: 8px;
 }
 
+.chord-card-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.chord-card-buttons .btn {
+  font-size: 0.85rem;
+  padding: 6px 12px;
+}
+
 .chords-grid.compact {
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 12px;

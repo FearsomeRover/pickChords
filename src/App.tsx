@@ -25,12 +25,13 @@ function App() {
 
   // Modals
   const [showAuthModal, setShowAuthModal] = useState(false)
-  const [showAddChordModal, setShowAddChordModal] = useState(false)
+  const [showChordModal, setShowChordModal] = useState(false)
   const [showAddSongModal, setShowAddSongModal] = useState(false)
   const [selectedSong, setSelectedSong] = useState<Song | null>(null)
 
-  // New chord form
-  const [newChord, setNewChord] = useState<{
+  // Chord form (for add/edit)
+  const [editingChordId, setEditingChordId] = useState<number | null>(null)
+  const [chordForm, setChordForm] = useState<{
     name: string
     strings: StringData[]
   }>({
@@ -119,9 +120,9 @@ function App() {
   }
 
   const handleStringChange = (index: number, value: string) => {
-    const newStrings = [...newChord.strings]
+    const newStrings = [...chordForm.strings]
     newStrings[index] = parseStringInput(value)
-    setNewChord({ ...newChord, strings: newStrings })
+    setChordForm({ ...chordForm, strings: newStrings })
   }
 
   const getStringDisplayValue = (stringData: StringData): string => {
@@ -131,23 +132,44 @@ function App() {
     return String(stringData.fret)
   }
 
-  const handleAddChord = async () => {
-    if (!newChord.name.trim()) return
+  const openAddChordModal = () => {
+    setEditingChordId(null)
+    setChordForm({ name: '', strings: Array(6).fill({ fret: 0 }) })
+    setShowChordModal(true)
+  }
+
+  const openEditChordModal = (chord: Chord) => {
+    setEditingChordId(chord.id)
+    setChordForm({ name: chord.name, strings: [...chord.strings] })
+    setShowChordModal(true)
+  }
+
+  const closeChordModal = () => {
+    setShowChordModal(false)
+    setEditingChordId(null)
+    setChordForm({ name: '', strings: Array(6).fill({ fret: 0 }) })
+  }
+
+  const handleSaveChord = async () => {
+    if (!chordForm.name.trim()) return
 
     try {
-      await api.post('/api/chords', {
-        name: newChord.name.trim(),
-        strings: newChord.strings,
-      })
+      if (editingChordId) {
+        await api.put(`/api/chords/${editingChordId}`, {
+          name: chordForm.name.trim(),
+          strings: chordForm.strings,
+        })
+      } else {
+        await api.post('/api/chords', {
+          name: chordForm.name.trim(),
+          strings: chordForm.strings,
+        })
+      }
 
-      setNewChord({
-        name: '',
-        strings: Array(6).fill({ fret: 0 }),
-      })
-      setShowAddChordModal(false)
+      closeChordModal()
       fetchChords(searchTerm)
     } catch (err) {
-      alert('Failed to add chord: ' + (err instanceof Error ? err.message : 'Unknown error'))
+      alert('Failed to save chord: ' + (err instanceof Error ? err.message : 'Unknown error'))
     }
   }
 
@@ -282,13 +304,20 @@ function App() {
                 <div key={chord.id} className="chord-card">
                   <h3>{chord.name}</h3>
                   <ChordDiagram chord={chord} />
-                  <button
-                    className="btn btn-secondary"
-                    style={{ marginTop: '12px', fontSize: '0.85rem', padding: '6px 12px' }}
-                    onClick={() => handleDeleteChord(chord.id)}
-                  >
-                    Delete
-                  </button>
+                  <div className="chord-card-buttons">
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => openEditChordModal(chord)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => handleDeleteChord(chord.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -322,25 +351,25 @@ function App() {
 
       <button
         className="add-chord-btn"
-        onClick={() => activeTab === 'chords' ? setShowAddChordModal(true) : setShowAddSongModal(true)}
+        onClick={() => activeTab === 'chords' ? openAddChordModal() : setShowAddSongModal(true)}
       >
         +
       </button>
 
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
 
-      {showAddChordModal && (
-        <div className="modal-overlay" onClick={() => setShowAddChordModal(false)}>
+      {showChordModal && (
+        <div className="modal-overlay" onClick={closeChordModal}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Add New Chord</h2>
+            <h2>{editingChordId ? 'Edit Chord' : 'Add New Chord'}</h2>
 
             <div className="form-group">
               <label>Chord Name</label>
               <input
                 type="text"
                 placeholder="e.g., Am7, Gmaj7, F#m"
-                value={newChord.name}
-                onChange={(e) => setNewChord({ ...newChord, name: e.target.value })}
+                value={chordForm.name}
+                onChange={(e) => setChordForm({ ...chordForm, name: e.target.value })}
               />
             </div>
 
@@ -353,7 +382,7 @@ function App() {
                     <input
                       type="text"
                       placeholder="0"
-                      value={getStringDisplayValue(newChord.strings[i])}
+                      value={getStringDisplayValue(chordForm.strings[i])}
                       onChange={(e) => handleStringChange(i, e.target.value)}
                     />
                   </div>
@@ -367,16 +396,16 @@ function App() {
             <div style={{ marginTop: '20px', marginBottom: '20px' }}>
               <p style={{ marginBottom: '10px', color: '#888' }}>Preview:</p>
               <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <ChordDiagram chord={newChord} />
+                <ChordDiagram chord={chordForm} />
               </div>
             </div>
 
             <div className="button-group">
-              <button className="btn btn-secondary" onClick={() => setShowAddChordModal(false)}>
+              <button className="btn btn-secondary" onClick={closeChordModal}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={handleAddChord}>
-                Add Chord
+              <button className="btn btn-primary" onClick={handleSaveChord}>
+                {editingChordId ? 'Save' : 'Add Chord'}
               </button>
             </div>
           </div>
