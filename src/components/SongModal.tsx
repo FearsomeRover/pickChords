@@ -1,4 +1,3 @@
-import React from 'react'
 import { Song } from '../types'
 import ChordDiagram from './ChordDiagram'
 import TagChip from './TagChip'

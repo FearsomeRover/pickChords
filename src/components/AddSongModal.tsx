@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Chord, Tag } from '../types'
 import { useApi } from '../hooks/useApi'
 import TagChip from './TagChip'

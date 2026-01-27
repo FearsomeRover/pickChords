@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { createContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { User, AuthState } from '../types'
 
 const API_URL = import.meta.env.VITE_API_URL || ''

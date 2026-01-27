@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Chord, Song, Tag, StringData } from './types'
 import { useAuth } from './hooks/useAuth'
 import { useApi } from './hooks/useApi'
@@ -9,8 +9,6 @@ import SongCard from './components/SongCard'
 import SongModal from './components/SongModal'
 import AddSongModal from './components/AddSongModal'
 import TagChip from './components/TagChip'
-
-const API_URL = import.meta.env.VITE_API_URL || ''
 
 function App() {
   const { user, loading: authLoading, logout } = useAuth()
