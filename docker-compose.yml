@@ -2,11 +2,10 @@ services:
   app:
     build: .
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     environment:
       - DATABASE_URL=postgresql://pickchords:pickchords@db:5432/pickchords
       - JWT_SECRET=${JWT_SECRET:-change-this-secret-in-production}
-      - PORT=3000
     depends_on:
       db:
         condition: service_healthy
