@@ -1,20 +1,13 @@
 import React from 'react'
+import { Chord, StringData } from '../types'
 
-// Chord data format:
-// {
-//   name: "A",
-//   strings: [
-//     { fret: 'x' },           // 6th string (low E) - muted
-//     { fret: 0 },             // 5th string (A) - open
-//     { fret: 2, finger: 1 },  // 4th string (D) - fret 2, finger 1
-//     { fret: 2, finger: 2 },  // 3rd string (G) - fret 2, finger 2
-//     { fret: 2, finger: 3 },  // 2nd string (B) - fret 2, finger 3
-//     { fret: 0 },             // 1st string (high E) - open
-//   ],
-//   startFret: 1  // optional, for barre chords starting higher up
-// }
+interface ChordDiagramProps {
+  chord: Partial<Chord> & { strings: StringData[] };
+  width?: number;
+  height?: number;
+}
 
-export default function ChordDiagram({ chord, width = 160, height = 200 }) {
+export default function ChordDiagram({ chord, width = 160, height = 200 }: ChordDiagramProps) {
   const padding = { top: 35, left: 20, right: 20, bottom: 15 }
   const numStrings = 6
   const numFrets = 5
@@ -25,8 +18,8 @@ export default function ChordDiagram({ chord, width = 160, height = 200 }) {
   const stringSpacing = diagramWidth / (numStrings - 1)
   const fretSpacing = diagramHeight / numFrets
 
-  const getStringX = (stringIndex) => padding.left + stringIndex * stringSpacing
-  const getFretY = (fretIndex) => padding.top + fretIndex * fretSpacing
+  const getStringX = (stringIndex: number) => padding.left + stringIndex * stringSpacing
+  const getFretY = (fretIndex: number) => padding.top + fretIndex * fretSpacing
 
   const backgroundColor = '#1a1a1a'
   const lineColor = '#666'
@@ -34,13 +27,15 @@ export default function ChordDiagram({ chord, width = 160, height = 200 }) {
   const textColor = '#fff'
   const mutedColor = '#888'
 
+  const startFret = chord.start_fret || 1
+
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
       {/* Background */}
       <rect width={width} height={height} fill={backgroundColor} />
 
       {/* Nut (thick line at top if starting from fret 1) */}
-      {(!chord.startFret || chord.startFret === 1) && (
+      {startFret === 1 && (
         <line
           x1={padding.left}
           y1={padding.top}
@@ -52,7 +47,7 @@ export default function ChordDiagram({ chord, width = 160, height = 200 }) {
       )}
 
       {/* Start fret indicator for barre chords */}
-      {chord.startFret && chord.startFret > 1 && (
+      {startFret > 1 && (
         <text
           x={padding.left - 15}
           y={padding.top + fretSpacing / 2 + 5}
@@ -60,7 +55,7 @@ export default function ChordDiagram({ chord, width = 160, height = 200 }) {
           fontSize="12"
           textAnchor="middle"
         >
-          {chord.startFret}
+          {startFret}
         </text>
       )}
 
@@ -138,8 +133,8 @@ export default function ChordDiagram({ chord, width = 160, height = 200 }) {
         }
 
         // Fretted note - draw filled circle with finger number
-        const fretNum = chord.startFret && chord.startFret > 1
-          ? string.fret - chord.startFret + 1
+        const fretNum = startFret > 1
+          ? string.fret - startFret + 1
           : string.fret
         const y = getFretY(fretNum) - fretSpacing / 2
         const radius = 14
