@@ -1,6 +1,9 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      args:
+        - BASE_PATH=${BASE_PATH:-/}
     ports:
       - "${PORT:-3000}:3000"
     environment:

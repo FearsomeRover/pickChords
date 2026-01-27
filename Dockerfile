@@ -1,6 +1,8 @@
 # Stage 1: Build frontend
 FROM node:20-alpine AS frontend-build
 WORKDIR /app
+ARG BASE_PATH=/
+ENV BASE_PATH=$BASE_PATH
 COPY package*.json ./
 RUN npm ci
 COPY tsconfig.json tsconfig.node.json vite.config.ts index.html ./
