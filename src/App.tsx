@@ -104,8 +104,8 @@ function App() {
 
   const parseStringInput = (value: string): StringData => {
     const trimmed = value.trim().toLowerCase()
-    if (trimmed === 'x') return { fret: 'x' }
     if (trimmed === '' || trimmed === '0') return { fret: 0 }
+    if (trimmed.includes('x')) return { fret: 'x' }
 
     const parts = trimmed.split('-')
     const fret = parseInt(parts[0], 10)
