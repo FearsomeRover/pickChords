@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Song, Chord, Tag, LogEntry, LogLevel } from '../types'
+import { Song, Chord, Tag, LogEntry, LogLevel, SongProgress, ProgressStatus } from '../types'
 import { useApi } from './useApi'
 
 // Query keys
@@ -11,6 +11,8 @@ export const queryKeys = {
   tags: () => ['tags'] as const,
   logs: (params?: { level?: LogLevel; action?: string; limit?: number; offset?: number }) =>
     ['logs', params] as const,
+  progress: () => ['progress'] as const,
+  progressItem: (songId: number) => ['progress', songId] as const,
 }
 
 // Songs queries
@@ -415,6 +417,149 @@ export function useClearLogs() {
     mutationFn: (days?: number) => api.del(`/api/logs/clear${days ? `?days=${days}` : ''}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['logs'] })
+    },
+  })
+}
+
+// Progress queries (Kanban board)
+export function useProgress() {
+  const api = useApi()
+
+  return useQuery({
+    queryKey: queryKeys.progress(),
+    queryFn: () => api.get<SongProgress[]>('/api/progress'),
+  })
+}
+
+export function useProgressItem(songId: number | undefined) {
+  const api = useApi()
+
+  return useQuery({
+    queryKey: queryKeys.progressItem(songId!),
+    queryFn: () => api.get<SongProgress | null>(`/api/progress/${songId}`),
+    enabled: !!songId,
+  })
+}
+
+export function useAddToProgress() {
+  const api = useApi()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (data: { songId: number; status?: ProgressStatus }) =>
+      api.post<SongProgress>('/api/progress', data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.progress() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.progressItem(variables.songId) })
+    },
+  })
+}
+
+export function useUpdateProgress() {
+  const api = useApi()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ songId, status, position }: {
+      songId: number
+      status: ProgressStatus
+      position: number
+    }) => api.put<SongProgress>(`/api/progress/${songId}`, { status, position }),
+    onMutate: async ({ songId, status, position }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.progress() })
+
+      const previousProgress = queryClient.getQueryData<SongProgress[]>(queryKeys.progress())
+
+      if (previousProgress) {
+        const item = previousProgress.find(p => p.song_id === songId)
+        if (item) {
+          const oldStatus = item.status
+          const oldPosition = item.position
+
+          // Create new array with updated positions
+          const updated = previousProgress.map(p => {
+            if (p.song_id === songId) {
+              return { ...p, status, position }
+            }
+
+            // If status changed
+            if (oldStatus !== status) {
+              // Items in old column after removed item shift down
+              if (p.status === oldStatus && p.position > oldPosition) {
+                return { ...p, position: p.position - 1 }
+              }
+              // Items in new column at or after new position shift up
+              if (p.status === status && p.position >= position) {
+                return { ...p, position: p.position + 1 }
+              }
+            } else {
+              // Same column reorder
+              if (p.status === status) {
+                if (oldPosition < position && p.position > oldPosition && p.position <= position) {
+                  return { ...p, position: p.position - 1 }
+                }
+                if (oldPosition > position && p.position >= position && p.position < oldPosition) {
+                  return { ...p, position: p.position + 1 }
+                }
+              }
+            }
+
+            return p
+          })
+
+          queryClient.setQueryData<SongProgress[]>(queryKeys.progress(), updated)
+        }
+      }
+
+      return { previousProgress }
+    },
+    onError: (_, __, context) => {
+      if (context?.previousProgress) {
+        queryClient.setQueryData(queryKeys.progress(), context.previousProgress)
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.progress() })
+    },
+  })
+}
+
+export function useRemoveFromProgress() {
+  const api = useApi()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (songId: number) => api.del(`/api/progress/${songId}`),
+    onMutate: async (songId) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.progress() })
+
+      const previousProgress = queryClient.getQueryData<SongProgress[]>(queryKeys.progress())
+
+      if (previousProgress) {
+        const item = previousProgress.find(p => p.song_id === songId)
+        if (item) {
+          const updated = previousProgress
+            .filter(p => p.song_id !== songId)
+            .map(p => {
+              if (p.status === item.status && p.position > item.position) {
+                return { ...p, position: p.position - 1 }
+              }
+              return p
+            })
+          queryClient.setQueryData<SongProgress[]>(queryKeys.progress(), updated)
+        }
+      }
+
+      return { previousProgress }
+    },
+    onError: (_, __, context) => {
+      if (context?.previousProgress) {
+        queryClient.setQueryData(queryKeys.progress(), context.previousProgress)
+      }
+    },
+    onSettled: (_, __, songId) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.progress() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.progressItem(songId) })
     },
   })
 }

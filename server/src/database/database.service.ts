@@ -169,6 +169,28 @@ export class DatabaseService implements OnModuleInit {
         CREATE INDEX IF NOT EXISTS idx_logs_action ON logs(action)
       `);
 
+      // Create song_progress table for Kanban board
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS song_progress (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          song_id INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
+          status VARCHAR(50) NOT NULL DEFAULT 'want_to_learn',
+          position INTEGER NOT NULL DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id, song_id)
+        )
+      `);
+
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_song_progress_user ON song_progress(user_id)
+      `);
+
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_song_progress_status ON song_progress(status)
+      `);
+
       // Check if we have any chords, if not insert defaults
       const result = await client.query('SELECT COUNT(*) FROM chords');
       if (parseInt(result.rows[0].count) === 0) {

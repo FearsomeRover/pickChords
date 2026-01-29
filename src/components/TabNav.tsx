@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 
-export type TabType = 'chords' | 'songs' | 'favorites' | 'logs'
+export type TabType = 'chords' | 'songs' | 'favorites' | 'progress' | 'logs'
 
 interface TabNavProps {
   showFavorites: boolean
@@ -53,6 +53,20 @@ export default function TabNav({ showFavorites, user, onLoginClick, onLogout }: 
               }
             >
               Favorites
+            </NavLink>
+          )}
+          {user && (
+            <NavLink
+              to="/progress"
+              className={({ isActive }) =>
+                `px-6 py-2 text-sm font-medium uppercase tracking-wider cursor-pointer transition-all duration-200 no-underline ${
+                  isActive
+                    ? 'text-off-white border-b-2 border-coral'
+                    : 'text-cream hover:text-off-white'
+                }`
+              }
+            >
+              My Progress
             </NavLink>
           )}
           {isAdmin && (

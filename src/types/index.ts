@@ -71,3 +71,18 @@ export interface LogEntry {
   metadata: Record<string, any> | null;
   created_at: string;
 }
+
+export type ProgressStatus = 'want_to_learn' | 'learning' | 'practicing' | 'mastered';
+
+export interface SongProgress {
+  id: number;
+  user_id: number;
+  song_id: number;
+  status: ProgressStatus;
+  position: number;
+  created_at: string;
+  updated_at: string;
+  song_name?: string;
+  song_artist?: string;
+  chord_count?: number;
+}

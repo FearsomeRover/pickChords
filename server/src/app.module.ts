@@ -7,6 +7,7 @@ import { TagsModule } from './tags/tags.module';
 import { SongsModule } from './songs/songs.module';
 import { FavoritesModule } from './favorites/favorites.module';
 import { LogsModule } from './logs/logs.module';
+import { ProgressModule } from './progress/progress.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { LogsModule } from './logs/logs.module';
     TagsModule,
     SongsModule,
     FavoritesModule,
+    ProgressModule,
   ],
   controllers: [AppController],
 })

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Chord } from '../types'
+import { Chord, ProgressStatus } from '../types'
 import { useAuth } from '../hooks/useAuth'
 import {
   useSong,
@@ -10,6 +10,9 @@ import {
   useRemoveChordFromSong,
   useDeleteSong,
   useToggleFavorite,
+  useProgressItem,
+  useAddToProgress,
+  useRemoveFromProgress,
 } from '../hooks/useQueries'
 import ChordDiagram from './ChordDiagram'
 import TagChip from './TagChip'
@@ -30,9 +33,15 @@ export default function SongPage() {
   const deleteSongMutation = useDeleteSong()
   const toggleFavoriteMutation = useToggleFavorite()
 
+  // Progress tracking
+  const { data: progressItem } = useProgressItem(songId)
+  const addToProgressMutation = useAddToProgress()
+  const removeFromProgressMutation = useRemoveFromProgress()
+
   const [showChordPicker, setShowChordPicker] = useState(false)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null)
+  const [showProgressMenu, setShowProgressMenu] = useState(false)
 
   // Check if user can edit this song (owner or admin)
   const canEdit = user && song && (song.user_id === user.id || user.is_admin === true)
@@ -42,10 +51,13 @@ export default function SongPage() {
       if (openMenuIndex !== null) {
         setOpenMenuIndex(null)
       }
+      if (showProgressMenu) {
+        setShowProgressMenu(false)
+      }
     }
     document.addEventListener('click', handleClickOutside)
     return () => document.removeEventListener('click', handleClickOutside)
-  }, [openMenuIndex])
+  }, [openMenuIndex, showProgressMenu])
 
   const chords = song?.chords || []
 
@@ -121,6 +133,27 @@ export default function SongPage() {
     })
   }
 
+  const handleAddToProgress = (status: ProgressStatus) => {
+    if (!song || !user) return
+    addToProgressMutation.mutate({
+      songId: song.id,
+      status,
+    })
+    setShowProgressMenu(false)
+  }
+
+  const handleRemoveFromProgress = () => {
+    if (!song || !user) return
+    removeFromProgressMutation.mutate(song.id)
+  }
+
+  const progressStatusLabels: Record<ProgressStatus, string> = {
+    want_to_learn: 'Want to Learn',
+    learning: 'Learning',
+    practicing: 'Practicing',
+    mastered: 'Mastered',
+  }
+
   // Get chords that aren't already in the song
   const availableChords = allChords.filter(
     chord => !chords.some(c => c.id === chord.id)
@@ -162,6 +195,49 @@ export default function SongPage() {
             >
               {song.is_favorite ? '\u2605' : '\u2606'}
             </button>
+          )}
+          {user && (
+            <div className="relative">
+              {progressItem ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-light-gray">
+                    {progressStatusLabels[progressItem.status]}
+                  </span>
+                  <button
+                    className="px-3 py-1.5 text-sm rounded-lg font-medium bg-cream text-deep-navy border-2 border-[#D4C9BC] transition-all duration-200 hover:border-deep-navy cursor-pointer"
+                    onClick={handleRemoveFromProgress}
+                    title="Remove from progress board"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button
+                    className="px-3 py-1.5 text-sm rounded-lg font-medium bg-teal-green text-off-white transition-all duration-200 hover:opacity-80 border-0 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowProgressMenu(!showProgressMenu)
+                    }}
+                  >
+                    + Add to Progress
+                  </button>
+                  {showProgressMenu && (
+                    <div className="absolute right-0 top-10 bg-off-white rounded-lg shadow-lg border-2 border-[#D4C9BC] z-10 min-w-[160px]">
+                      {(Object.keys(progressStatusLabels) as ProgressStatus[]).map((status) => (
+                        <button
+                          key={status}
+                          className="w-full px-4 py-2 text-left text-sm text-deep-navy hover:bg-cream transition-all duration-200 border-0 cursor-pointer"
+                          onClick={() => handleAddToProgress(status)}
+                        >
+                          {progressStatusLabels[status]}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           )}
           {canEdit && (
             <button
