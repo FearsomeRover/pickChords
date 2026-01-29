@@ -33,13 +33,13 @@ export default function AuthModal({ onClose }: AuthModalProps) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>{mode === 'login' ? 'Login' : 'Create Account'}</h2>
+    <div className="fixed inset-0 bg-[rgba(15,27,46,0.7)] backdrop-blur-sm flex items-center justify-center z-[1000]" onClick={onClose}>
+      <div className="bg-off-white rounded-2xl p-8 max-w-[400px] w-[90%] border-2 border-[#D4C9BC] shadow-[0_12px_48px_rgba(15,27,46,0.2)]" onClick={(e) => e.stopPropagation()}>
+        <h2 className="mb-6 text-2xl font-bold text-deep-navy">{mode === 'login' ? 'Login' : 'Create Account'}</h2>
 
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Username</label>
+          <div className="mb-5">
+            <label className="block mb-2 font-medium text-deep-navy">Username</label>
             <input
               type="text"
               value={username}
@@ -47,11 +47,12 @@ export default function AuthModal({ onClose }: AuthModalProps) {
               placeholder="Enter username"
               minLength={3}
               required
+              className="w-full px-3.5 py-2.5 text-base border-2 border-[#D4C9BC] rounded-lg bg-off-white text-deep-navy outline-none focus:border-deep-navy focus:shadow-[0_0_0_3px_rgba(0,22,45,0.1)] placeholder:text-light-gray"
             />
           </div>
 
-          <div className="form-group">
-            <label>Password</label>
+          <div className="mb-5">
+            <label className="block mb-2 font-medium text-deep-navy">Password</label>
             <input
               type="password"
               value={password}
@@ -59,37 +60,40 @@ export default function AuthModal({ onClose }: AuthModalProps) {
               placeholder="Enter password"
               minLength={6}
               required
+              className="w-full px-3.5 py-2.5 text-base border-2 border-[#D4C9BC] rounded-lg bg-off-white text-deep-navy outline-none focus:border-deep-navy focus:shadow-[0_0_0_3px_rgba(0,22,45,0.1)] placeholder:text-light-gray"
             />
           </div>
 
           {error && (
-            <p style={{ color: '#f66', marginBottom: '16px' }}>{error}</p>
+            <p className="text-[#D64545] mb-4">{error}</p>
           )}
 
-          <div className="button-group">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
+          <div className="flex gap-3 justify-end mt-6">
+            <button
+              type="button"
+              className="px-5 py-2.5 text-base rounded-lg font-medium bg-off-white text-deep-navy border-2 border-[#D4C9BC] transition-all duration-200 hover:border-deep-navy cursor-pointer"
+              onClick={onClose}
+            >
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
+            <button
+              type="submit"
+              className="px-5 py-2.5 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading}
+            >
               {loading ? 'Loading...' : mode === 'login' ? 'Login' : 'Register'}
             </button>
           </div>
         </form>
 
-        <p style={{ marginTop: '20px', textAlign: 'center', color: '#888' }}>
+        <p className="mt-5 text-center text-light-gray text-sm">
           {mode === 'login' ? (
             <>
               Don't have an account?{' '}
               <button
                 type="button"
                 onClick={() => setMode('register')}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#5b8bd4',
-                  cursor: 'pointer',
-                  textDecoration: 'underline',
-                }}
+                className="bg-transparent border-0 text-teal-green cursor-pointer underline hover:opacity-80"
               >
                 Register
               </button>
@@ -100,13 +104,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
               <button
                 type="button"
                 onClick={() => setMode('login')}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#5b8bd4',
-                  cursor: 'pointer',
-                  textDecoration: 'underline',
-                }}
+                className="bg-transparent border-0 text-teal-green cursor-pointer underline hover:opacity-80"
               >
                 Login
               </button>

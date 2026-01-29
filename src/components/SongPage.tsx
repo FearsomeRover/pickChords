@@ -1,30 +1,58 @@
 import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { Song, Chord } from '../types'
 import { useApi } from '../hooks/useApi'
+import { useAuth } from '../hooks/useAuth'
 import ChordDiagram from './ChordDiagram'
 import TagChip from './TagChip'
+import StrummingPatternDisplay from './StrummingPatternDisplay'
 
-interface SongPageProps {
-  song: Song
-  onBack: () => void
-  onDelete: () => void
-  onUpdate: (song: Song) => void
-  onFavorite?: () => void
-  isFavorite?: boolean
-}
-
-export default function SongPage({ song, onBack, onDelete, onUpdate, onFavorite, isFavorite }: SongPageProps) {
+export default function SongPage() {
   const api = useApi()
-  const [chords, setChords] = useState<Chord[]>(song.chords || [])
+  const { user } = useAuth()
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+
+  const [song, setSong] = useState<Song | null>(null)
+  const [chords, setChords] = useState<Chord[]>([])
   const [allChords, setAllChords] = useState<Chord[]>([])
   const [showChordPicker, setShowChordPicker] = useState(false)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
-  const [editMode, setEditMode] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null)
 
   useEffect(() => {
-    fetchAllChords()
-  }, [])
+    if (id) {
+      fetchSong()
+      fetchAllChords()
+    }
+  }, [id])
+
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (openMenuIndex !== null) {
+        setOpenMenuIndex(null)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [openMenuIndex])
+
+  const fetchSong = async () => {
+    try {
+      setLoading(true)
+      const data = await api.get<Song>(`/api/songs/${id}`)
+      setSong(data)
+      setChords(data.chords || [])
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch song')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const fetchAllChords = async () => {
     try {
@@ -36,6 +64,7 @@ export default function SongPage({ song, onBack, onDelete, onUpdate, onFavorite,
   }
 
   const hasChanges = () => {
+    if (!song) return false
     const originalIds = song.chords?.map(c => c.id) || []
     const currentIds = chords.map(c => c.id)
     return JSON.stringify(originalIds) !== JSON.stringify(currentIds)
@@ -76,6 +105,7 @@ export default function SongPage({ song, onBack, onDelete, onUpdate, onFavorite,
   }
 
   const saveChanges = async () => {
+    if (!song) return
     setSaving(true)
     try {
       const newChordIds = chords.map(c => c.id)
@@ -86,11 +116,35 @@ export default function SongPage({ song, onBack, onDelete, onUpdate, onFavorite,
         chord_ids: newChordIds,
         tag_ids: song.tag_ids,
       })
-      onUpdate({ ...song, chords, chord_ids: newChordIds })
+      setSong({ ...song, chords, chord_ids: newChordIds })
     } catch (err) {
       alert('Failed to save: ' + (err instanceof Error ? err.message : 'Unknown error'))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!song || !confirm('Delete this song?')) return
+    try {
+      await api.del(`/api/songs/${song.id}`)
+      navigate(-1)
+    } catch (err) {
+      alert('Failed to delete song: ' + (err instanceof Error ? err.message : 'Unknown error'))
+    }
+  }
+
+  const handleToggleFavorite = async () => {
+    if (!song || !user) return
+    try {
+      if (song.is_favorite) {
+        await api.del(`/api/songs/${song.id}/favorite`)
+      } else {
+        await api.post(`/api/songs/${song.id}/favorite`, {})
+      }
+      setSong({ ...song, is_favorite: !song.is_favorite })
+    } catch (err) {
+      console.error('Failed to toggle favorite:', err)
     }
   }
 
@@ -99,35 +153,54 @@ export default function SongPage({ song, onBack, onDelete, onUpdate, onFavorite,
     chord => !chords.some(c => c.id === chord.id)
   )
 
-  return (
-    <div className="song-page">
-      <div className="song-page-header">
-        <button className="btn btn-secondary" onClick={onBack}>
-          Back
+  if (loading) {
+    return <div className="text-center py-10 text-light-gray">Loading...</div>
+  }
+
+  if (error || !song) {
+    return (
+      <div className="text-[#D64545] bg-[rgba(214,69,69,0.1)] border-2 border-[#D64545] rounded-lg text-center p-5">
+        {error || 'Song not found'}
+        <button
+          className="mt-4 px-5 py-2.5 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer"
+          onClick={() => navigate(-1)}
+        >
+          Go Back
         </button>
-        <div className="song-page-actions">
-          {onFavorite && (
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <h1 className="text-4xl font-bold text-deep-navy mb-2">{song.name}</h1>
+          {song.artist && <p className="text-light-gray text-lg">{song.artist}</p>}
+        </div>
+        <div className="flex gap-2 items-center">
+          {user && (
             <button
-              className={`favorite-btn large ${isFavorite ? 'active' : ''}`}
-              onClick={onFavorite}
-              title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+              className={`bg-transparent border-0 text-3xl cursor-pointer p-1 transition-all duration-200 hover:scale-110 ${
+                song.is_favorite ? 'text-mustard-yellow' : 'text-light-gray'
+              }`}
+              onClick={handleToggleFavorite}
+              title={song.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
             >
-              {isFavorite ? '\u2605' : '\u2606'}
+              {song.is_favorite ? '\u2605' : '\u2606'}
             </button>
           )}
-          <button className="btn btn-secondary" onClick={onDelete}>
+          <button
+            className="px-4 py-2 text-base rounded-lg font-medium bg-off-white text-deep-navy border-2 border-[#D4C9BC] transition-all duration-200 hover:border-deep-navy cursor-pointer"
+            onClick={handleDelete}
+          >
             Delete
           </button>
         </div>
       </div>
 
-      <div className="song-page-title">
-        <h1>{song.name}</h1>
-        {song.artist && <p className="song-artist">{song.artist}</p>}
-      </div>
-
       {song.tags && song.tags.length > 0 && (
-        <div className="song-tags" style={{ marginBottom: '24px' }}>
+        <div className="flex flex-wrap gap-1.5 mb-6">
           {song.tags.map((tag) => (
             <TagChip key={tag.id} tag={tag} />
           ))}
@@ -135,52 +208,54 @@ export default function SongPage({ song, onBack, onDelete, onUpdate, onFavorite,
       )}
 
       {song.notes && (
-        <div className="song-notes">
-          <h4>Notes</h4>
-          <p>{song.notes}</p>
+        <div className="bg-off-white rounded-xl p-5 border-2 border-[#D4C9BC] mb-6">
+          <h4 className="text-lg font-semibold text-deep-navy mb-2">Notes</h4>
+          <p className="text-deep-navy">{song.notes}</p>
         </div>
       )}
 
-      <div className="song-chords-section">
-        <div className="song-chords-header">
-          <h4>Chords</h4>
-          <div className="song-chords-header-actions">
-            <div className="view-toggle">
-              <button
-                className={`view-toggle-btn ${!editMode ? 'active' : ''}`}
-                onClick={() => setEditMode(false)}
-              >
-                View
-              </button>
-              <button
-                className={`view-toggle-btn ${editMode ? 'active' : ''}`}
-                onClick={() => setEditMode(true)}
-              >
-                Edit
-              </button>
-            </div>
-            {editMode && (
-              <button
-                className="btn btn-primary"
-                onClick={() => setShowChordPicker(!showChordPicker)}
-              >
-                {showChordPicker ? 'Done' : 'Add Chords'}
-              </button>
-            )}
-          </div>
+      {/* Strumming Pattern Section */}
+      {song.strumming_pattern ? (
+        <div className="mb-6">
+          <StrummingPatternDisplay
+            pattern={song.strumming_pattern}
+            onEdit={() => navigate(`/songs/${song.id}/strumming`)}
+          />
+        </div>
+      ) : (
+        <div className="bg-off-white rounded-xl p-5 border-2 border-[#D4C9BC] mb-6 flex justify-between items-center">
+          <span className="text-light-gray">No strumming pattern set</span>
+          <button
+            className="px-4 py-2 text-sm rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer"
+            onClick={() => navigate(`/songs/${song.id}/strumming`)}
+          >
+            Add Strumming Pattern
+          </button>
+        </div>
+      )}
+
+      <div className="bg-off-white rounded-xl p-6 border-2 border-[#D4C9BC]">
+        <div className="flex justify-between items-center mb-5">
+          <h4 className="text-lg font-semibold text-deep-navy">Chords</h4>
+          <button
+            className="px-4 py-2 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer"
+            onClick={() => setShowChordPicker(!showChordPicker)}
+          >
+            {showChordPicker ? 'Done' : 'Add Chords'}
+          </button>
         </div>
 
-        {editMode && showChordPicker && (
-          <div className="chord-picker">
-            <p className="chord-picker-label">Select chords to add:</p>
+        {showChordPicker && (
+          <div className="bg-cream rounded-lg p-4 mb-5 border-2 border-[#D4C9BC]">
+            <p className="text-deep-navy font-medium mb-3">Select chords to add:</p>
             {availableChords.length === 0 ? (
-              <p className="help-text">All chords are already added to this song.</p>
+              <p className="text-light-gray text-sm">All chords are already added to this song.</p>
             ) : (
-              <div className="chord-picker-list">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2">
                 {availableChords.map((chord) => (
                   <button
                     key={chord.id}
-                    className="chord-picker-item-simple"
+                    className="px-3 py-2 text-sm font-medium bg-teal-green text-off-white rounded-lg transition-all duration-200 hover:opacity-80 border-0 cursor-pointer"
                     onClick={() => addChord(chord)}
                   >
                     {chord.name}
@@ -192,74 +267,81 @@ export default function SongPage({ song, onBack, onDelete, onUpdate, onFavorite,
         )}
 
         {chords.length > 0 ? (
-          editMode ? (
-            <div className="song-chords-reorderable">
-              {chords.map((chord, index) => (
-                <div
-                  key={`${chord.id}-${index}`}
-                  className={`chord-card-draggable ${draggedIndex === index ? 'dragging' : ''}`}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, index)}
-                  onDragOver={(e) => handleDragOver(e, index)}
-                  onDragEnd={handleDragEnd}
-                >
-                  <div className="chord-card-drag-handle">
-                    <span className="drag-icon">&#x2630;</span>
-                  </div>
-                  <div className="chord-card-content">
-                    <h3>{chord.name}</h3>
-                    <ChordDiagram chord={chord} width={140} height={170} />
-                  </div>
-                  <div className="chord-card-actions">
-                    <div className="chord-card-reorder-buttons">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
+            {chords.map((chord, index) => (
+              <div
+                key={`${chord.id}-${index}`}
+                className="bg-cream rounded-lg p-4 text-center border-2 border-[#D4C9BC] transition-all duration-200 relative cursor-move hover:border-teal-green"
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragEnd={handleDragEnd}
+              >
+                <div className="absolute top-2 right-2">
+                  <button
+                    className="w-8 h-8 flex items-center justify-center bg-off-white text-deep-navy rounded-lg border-2 border-[#D4C9BC] transition-all duration-200 hover:border-deep-navy cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setOpenMenuIndex(openMenuIndex === index ? null : index)
+                    }}
+                  >
+                    &#x22EE;
+                  </button>
+                  {openMenuIndex === index && (
+                    <div className="absolute right-0 top-10 bg-off-white rounded-lg shadow-lg border-2 border-[#D4C9BC] z-10 min-w-[140px]">
                       <button
-                        className="reorder-btn"
-                        onClick={() => moveChord(index, index - 1)}
+                        className="w-full px-4 py-2 text-left text-sm text-deep-navy hover:bg-cream transition-all duration-200 border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={() => {
+                          moveChord(index, index - 1)
+                          setOpenMenuIndex(null)
+                        }}
                         disabled={index === 0}
-                        title="Move up"
                       >
-                        &#9650;
+                        Move Up
                       </button>
                       <button
-                        className="reorder-btn"
-                        onClick={() => moveChord(index, index + 1)}
+                        className="w-full px-4 py-2 text-left text-sm text-deep-navy hover:bg-cream transition-all duration-200 border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={() => {
+                          moveChord(index, index + 1)
+                          setOpenMenuIndex(null)
+                        }}
                         disabled={index === chords.length - 1}
-                        title="Move down"
                       >
-                        &#9660;
+                        Move Down
+                      </button>
+                      <button
+                        className="w-full px-4 py-2 text-left text-sm text-[#D64545] hover:bg-cream transition-all duration-200 border-0 cursor-pointer"
+                        onClick={() => {
+                          removeChord(index)
+                          setOpenMenuIndex(null)
+                        }}
+                      >
+                        Delete
                       </button>
                     </div>
-                    <button
-                      className="remove-btn"
-                      onClick={() => removeChord(index)}
-                      title="Remove chord"
-                    >
-                      &#x2715;
-                    </button>
-                  </div>
+                  )}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="song-chords-grid">
-              {chords.map((chord, index) => (
-                <div key={`${chord.id}-${index}`} className="chord-card">
-                  <h3>{chord.name}</h3>
-                  <ChordDiagram chord={chord} width={160} height={200} />
+                <h3 className="text-xl font-semibold text-teal-green mb-3">{chord.name}</h3>
+                <div className="flex justify-center">
+                  <ChordDiagram chord={chord} width={180} height={220} />
                 </div>
-              ))}
-            </div>
-          )
+              </div>
+            ))}
+          </div>
         ) : (
-          <div className="no-results">
-            No chords added to this song yet.{editMode && " Click \"Add Chords\" to get started."}
+          <div className="text-center text-light-gray text-lg py-6">
+            No chords added to this song yet. Click "Add Chords" to get started.
           </div>
         )}
 
-        {editMode && hasChanges() && (
-          <div className="save-order-bar">
-            <span>You have unsaved changes</span>
-            <button className="btn btn-primary" onClick={saveChanges} disabled={saving}>
+        {hasChanges() && (
+          <div className="flex justify-between items-center bg-mustard-yellow rounded-lg p-4 mt-5">
+            <span className="text-deep-navy font-medium">You have unsaved changes</span>
+            <button
+              className="px-5 py-2.5 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={saveChanges}
+              disabled={saving}
+            >
               {saving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>

@@ -17,6 +17,16 @@ export interface Tag {
   color: string;
 }
 
+// Stroke types for strumming patterns
+export type StrokeType = 'down' | 'up' | 'mute_down' | 'mute_up' | 'accent_down' | 'accent_up' | 'rest' | 'skip';
+
+export interface StrummingPattern {
+  strokes: StrokeType[];
+  tempo: number;
+  noteLength: '1/4' | '1/8' | '1/8 triplet' | '1/16' | '1/16 triplet';
+  songPart?: string;
+}
+
 export interface Song {
   id: number;
   name: string;
@@ -27,6 +37,7 @@ export interface Song {
   chords?: Chord[];
   tags?: Tag[];
   is_favorite?: boolean;
+  strumming_pattern?: StrummingPattern;
   created_at: string;
 }
 

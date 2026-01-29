@@ -16,7 +16,9 @@ A personal guitar chord library web application with songs, tags, and favorites.
 - Tags with custom colors
 - Favorites system (requires login)
 - Search and filter functionality
-- Responsive dark-themed UI
+- React Router with code splitting
+- Bookmarkable URLs and browser navigation
+- Warm cream & coral themed UI
 - Docker containerization with multi-stage build
 - Subpath deployment support (BASE_PATH)
 - Nginx reverse proxy configuration
@@ -27,12 +29,28 @@ Nginx  →  Docker (Frontend + NestJS API)  →  PostgreSQL
 ```
 
 ## Tech Stack
-- **Frontend:** React 19, Vite, TypeScript
+- **Frontend:** React 19, Vite, TypeScript, React Router 7
 - **Backend:** NestJS 10, TypeScript
 - **Database:** PostgreSQL with JSONB
 - **Auth:** JWT with Passport
-- **Styling:** Plain CSS (dark theme)
+- **Styling:** Plain CSS (warm cream & coral theme)
 - **Deployment:** Docker, Nginx
+
+## Color Scheme
+**Primary Colors:**
+- Deep Navy `#00162D` - Text, buttons, active states
+- Cream `#F5F0E8` - Main background
+- Peachy Pink `#EFAA97` - Outer background, hover states
+
+**Accent Colors:**
+- Coral `#FF9F87` - Decorative accents
+- Golden Orange `#F4A261` - Warm highlights
+- Teal Green `#2D6A5C` - Chord names
+
+**Supporting Colors:**
+- Light Gray `#B8BAB8` - Muted text, borders
+- Off White `#FFFEF9` - Surface backgrounds
+- Mustard Yellow `#E8A83A` - Favorites
 
 ## Project Structure
 ```
@@ -48,14 +66,48 @@ server/                         # NestJS Backend
     favorites/                  # Favorites management
 
 src/                            # React TypeScript Frontend
-  main.tsx
-  App.tsx
-  index.css
+  main.tsx                      # Entry point
+  App.tsx                       # RouterProvider setup
+  router.tsx                    # Route configuration
+  index.css                     # Global styles
   types/                        # TypeScript interfaces
   components/                   # React components
+    Layout.tsx                  # Shared layout with header
+    ChordDiagram.tsx           # SVG chord visualization
+    SongPage.tsx               # Song detail page
+    SongCard.tsx               # Song list item
+    TabNav.tsx                 # Navigation tabs
+    AuthModal.tsx              # Login/register modal
+    AddSongModal.tsx           # Add song modal
+    TagChip.tsx                # Tag display component
+  pages/                        # Route pages
+    ChordsPage.tsx             # /chords route
+    SongsPage.tsx              # /songs route
+    FavoritesPage.tsx          # /favorites route
+    NotFoundPage.tsx           # 404 page
   hooks/                        # Custom hooks
+    useAuth.ts                 # Authentication hook
+    useApi.ts                  # API client hook
   context/                      # React context
+    AuthContext.tsx            # Auth state management
 ```
+
+## Routes
+
+```
+/                          → Redirects to /chords
+/chords                    → Chords list with search
+/songs                     → Songs list with filters
+/songs/:id                 → Song detail page (lazy loaded)
+/favorites                 → User's favorite songs (auth required)
+/*                         → 404 page
+```
+
+All routes support:
+- URL search params (`?search=...&tag=...`)
+- Browser back/forward navigation
+- Direct linking
+- Subpath deployment via `BASE_PATH`
 
 ## Data Models
 

@@ -1,14 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Chord, Tag } from '../types'
+import { useNavigate } from 'react-router-dom'
+import { Chord, Tag, Song } from '../types'
 import { useApi } from '../hooks/useApi'
-import TagChip from './TagChip'
+import TagChip from '../components/TagChip'
 
-interface AddSongModalProps {
-  onClose: () => void
-  onAdd: () => void
-}
-
-export default function AddSongModal({ onClose, onAdd }: AddSongModalProps) {
+export default function NewSongPage() {
+  const navigate = useNavigate()
   const [name, setName] = useState('')
   const [artist, setArtist] = useState('')
   const [notes, setNotes] = useState('')
@@ -70,15 +67,14 @@ export default function AddSongModal({ onClose, onAdd }: AddSongModalProps) {
     if (!name.trim()) return
     setLoading(true)
     try {
-      await api.post('/api/songs', {
+      const song = await api.post<Song>('/api/songs', {
         name: name.trim(),
         artist: artist.trim() || undefined,
         notes: notes.trim() || undefined,
         chord_ids: selectedChordIds,
         tag_ids: selectedTagIds,
       })
-      onAdd()
-      onClose()
+      navigate(`/songs/${song.id}`)
     } catch (err) {
       console.error('Failed to add song:', err)
       alert('Failed to add song')
@@ -88,10 +84,18 @@ export default function AddSongModal({ onClose, onAdd }: AddSongModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 bg-[rgba(15,27,46,0.7)] backdrop-blur-sm flex items-center justify-center z-[1000]" onClick={onClose}>
-      <div className="bg-off-white rounded-2xl p-8 max-w-[600px] w-[90%] max-h-[90vh] overflow-y-auto border-2 border-[#D4C9BC] shadow-[0_12px_48px_rgba(15,27,46,0.2)]" onClick={(e) => e.stopPropagation()}>
-        <h2 className="mb-6 text-2xl font-bold text-deep-navy">Add New Song</h2>
+    <div className="max-w-[800px] mx-auto">
+      <div className="flex justify-between items-start mb-6">
+        <h1 className="text-4xl font-bold text-deep-navy">Create New Song</h1>
+        <button
+          className="px-4 py-2 text-base rounded-lg font-medium bg-off-white text-deep-navy border-2 border-[#D4C9BC] transition-all duration-200 hover:border-deep-navy cursor-pointer"
+          onClick={() => navigate(-1)}
+        >
+          Cancel
+        </button>
+      </div>
 
+      <div className="bg-off-white rounded-xl p-8 border-2 border-[#D4C9BC]">
         <div className="mb-5">
           <label className="block mb-2 font-medium text-deep-navy">Song Name *</label>
           <input
@@ -127,7 +131,7 @@ export default function AddSongModal({ onClose, onAdd }: AddSongModalProps) {
 
         <div className="mb-5">
           <label className="block mb-2 font-medium text-deep-navy">Select Chords</label>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2 max-h-[200px] overflow-y-auto p-2 bg-cream rounded-lg border-2 border-[#D4C9BC]">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2 max-h-[300px] overflow-y-auto p-2 bg-cream rounded-lg border-2 border-[#D4C9BC]">
             {chords.map((chord) => (
               <button
                 key={chord.id}
@@ -181,10 +185,10 @@ export default function AddSongModal({ onClose, onAdd }: AddSongModalProps) {
           </div>
         </div>
 
-        <div className="flex gap-3 justify-end mt-6">
+        <div className="flex gap-3 justify-end mt-8">
           <button
             className="px-5 py-2.5 text-base rounded-lg font-medium bg-off-white text-deep-navy border-2 border-[#D4C9BC] transition-all duration-200 hover:border-deep-navy cursor-pointer"
-            onClick={onClose}
+            onClick={() => navigate(-1)}
           >
             Cancel
           </button>
@@ -193,7 +197,7 @@ export default function AddSongModal({ onClose, onAdd }: AddSongModalProps) {
             onClick={handleSubmit}
             disabled={loading || !name.trim()}
           >
-            {loading ? 'Adding...' : 'Add Song'}
+            {loading ? 'Creating...' : 'Create Song'}
           </button>
         </div>
       </div>

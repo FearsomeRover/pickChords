@@ -33,12 +33,26 @@ export class DatabaseService implements OnModuleInit {
           name VARCHAR(100) NOT NULL,
           strings JSONB NOT NULL,
           start_fret INTEGER DEFAULT 1,
+          usage_count INTEGER DEFAULT 0,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `);
 
       await client.query(`
         CREATE INDEX IF NOT EXISTS idx_chords_name ON chords(LOWER(name))
+      `);
+
+      // Add usage_count column if it doesn't exist (for existing databases)
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name='chords' AND column_name='usage_count'
+          ) THEN
+            ALTER TABLE chords ADD COLUMN usage_count INTEGER DEFAULT 0;
+          END IF;
+        END $$;
       `);
 
       // Create users table
@@ -70,8 +84,22 @@ export class DatabaseService implements OnModuleInit {
           notes TEXT,
           chord_ids JSONB NOT NULL DEFAULT '[]',
           tag_ids JSONB NOT NULL DEFAULT '[]',
+          strumming_pattern JSONB,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
+      `);
+
+      // Add strumming_pattern column if it doesn't exist (for existing databases)
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name='songs' AND column_name='strumming_pattern'
+          ) THEN
+            ALTER TABLE songs ADD COLUMN strumming_pattern JSONB;
+          END IF;
+        END $$;
       `);
 
       // Create favorites table

@@ -4,6 +4,13 @@ import { ChordsService } from '../chords/chords.service';
 import { TagsService } from '../tags/tags.service';
 import { CreateSongDto } from './dto/create-song.dto';
 
+export interface StrummingPattern {
+  strokes: string[];
+  tempo: number;
+  noteLength: string;
+  songPart?: string;
+}
+
 export interface Song {
   id: number;
   name: string;
@@ -11,6 +18,7 @@ export interface Song {
   notes?: string;
   chord_ids: number[];
   tag_ids: number[];
+  strumming_pattern?: StrummingPattern;
   created_at: string;
 }
 
@@ -104,20 +112,41 @@ export class SongsService {
   }
 
   async create(createSongDto: CreateSongDto): Promise<Song> {
-    const { name, artist, notes, chord_ids = [], tag_ids = [] } = createSongDto;
+    const { name, artist, notes, chord_ids = [], tag_ids = [], strumming_pattern } = createSongDto;
 
     const result = await this.db.query(
-      `INSERT INTO songs (name, artist, notes, chord_ids, tag_ids)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO songs (name, artist, notes, chord_ids, tag_ids, strumming_pattern)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [name, artist || null, notes || null, JSON.stringify(chord_ids), JSON.stringify(tag_ids)]
+      [
+        name,
+        artist || null,
+        notes || null,
+        JSON.stringify(chord_ids),
+        JSON.stringify(tag_ids),
+        strumming_pattern ? JSON.stringify(strumming_pattern) : null
+      ]
     );
+
+    // Increment usage count for all chords in this song
+    if (chord_ids.length > 0) {
+      await this.chordsService.incrementUsageCount(chord_ids);
+    }
 
     return result.rows[0];
   }
 
   async update(id: number, updateSongDto: Partial<CreateSongDto>): Promise<Song> {
-    const { name, artist, notes, chord_ids, tag_ids } = updateSongDto;
+    const { name, artist, notes, chord_ids, tag_ids, strumming_pattern } = updateSongDto;
+
+    // Get the old chord_ids if we're updating chords
+    let oldChordIds: number[] = [];
+    if (chord_ids !== undefined) {
+      const oldSong = await this.db.query('SELECT chord_ids FROM songs WHERE id = $1', [id]);
+      if (oldSong.rows.length > 0) {
+        oldChordIds = oldSong.rows[0].chord_ids || [];
+      }
+    }
 
     const result = await this.db.query(
       `UPDATE songs
@@ -125,8 +154,9 @@ export class SongsService {
            artist = COALESCE($2, artist),
            notes = COALESCE($3, notes),
            chord_ids = COALESCE($4, chord_ids),
-           tag_ids = COALESCE($5, tag_ids)
-       WHERE id = $6
+           tag_ids = COALESCE($5, tag_ids),
+           strumming_pattern = COALESCE($6, strumming_pattern)
+       WHERE id = $7
        RETURNING *`,
       [
         name,
@@ -134,12 +164,28 @@ export class SongsService {
         notes,
         chord_ids ? JSON.stringify(chord_ids) : null,
         tag_ids ? JSON.stringify(tag_ids) : null,
+        strumming_pattern !== undefined ? JSON.stringify(strumming_pattern) : null,
         id,
       ]
     );
 
     if (result.rows.length === 0) {
       throw new NotFoundException('Song not found');
+    }
+
+    // Update usage counts if chords changed
+    if (chord_ids !== undefined) {
+      // Find chords that were removed
+      const removedChords = oldChordIds.filter(id => !chord_ids.includes(id));
+      if (removedChords.length > 0) {
+        await this.chordsService.decrementUsageCount(removedChords);
+      }
+
+      // Find chords that were added
+      const addedChords = chord_ids.filter(id => !oldChordIds.includes(id));
+      if (addedChords.length > 0) {
+        await this.chordsService.incrementUsageCount(addedChords);
+      }
     }
 
     return result.rows[0];
@@ -150,6 +196,12 @@ export class SongsService {
 
     if (result.rows.length === 0) {
       throw new NotFoundException('Song not found');
+    }
+
+    // Decrement usage count for all chords in this song
+    const deletedSong = result.rows[0];
+    if (deletedSong.chord_ids && deletedSong.chord_ids.length > 0) {
+      await this.chordsService.decrementUsageCount(deletedSong.chord_ids);
     }
 
     return result.rows[0];

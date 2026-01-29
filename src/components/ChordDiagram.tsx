@@ -1,4 +1,4 @@
-import { Chord, StringData } from '../types'
+import { Chord, StringData } from "../types";
 
 interface ChordDiagramProps {
   chord: Partial<Chord> & { strings: StringData[] };
@@ -7,79 +7,87 @@ interface ChordDiagramProps {
 }
 
 interface Barre {
-  fret: number
-  finger: number
-  fromString: number
-  toString: number
+  fret: number;
+  finger: number;
+  fromString: number;
+  toString: number;
 }
 
-export default function ChordDiagram({ chord, width = 160, height = 200 }: ChordDiagramProps) {
-  const padding = { top: 35, left: 20, right: 20, bottom: 15 }
-  const numStrings = 6
-  const numFrets = 5
+export default function ChordDiagram({
+  chord,
+  width = 160,
+  height = 200,
+}: ChordDiagramProps) {
+  const padding = { top: 35, left: 20, right: 20, bottom: 15 };
+  const numStrings = 6;
+  const numFrets = 5;
 
-  const diagramWidth = width - padding.left - padding.right
-  const diagramHeight = height - padding.top - padding.bottom
+  const diagramWidth = width - padding.left - padding.right;
+  const diagramHeight = height - padding.top - padding.bottom;
 
-  const stringSpacing = diagramWidth / (numStrings - 1)
-  const fretSpacing = diagramHeight / numFrets
+  const stringSpacing = diagramWidth / (numStrings - 1);
+  const fretSpacing = diagramHeight / numFrets;
 
-  const getStringX = (stringIndex: number) => padding.left + stringIndex * stringSpacing
-  const getFretY = (fretIndex: number) => padding.top + fretIndex * fretSpacing
+  const getStringX = (stringIndex: number) =>
+    padding.left + stringIndex * stringSpacing;
+  const getFretY = (fretIndex: number) => padding.top + fretIndex * fretSpacing;
 
-  const backgroundColor = '#0e402d'
-  const lineColor = '#5a6650'
-  const fingerColor = '#9fcc2e'
-  const textColor = '#000000'
-  const mutedColor = '#5a6650'
+  const backgroundColor = "#2B7463";
+  const lineColor = "#00162D";
+  const fingerColor = "#FFBA55";
+  const textColor = "#00162D";
+  const mutedColor = "#00162D";
 
-  const startFret = chord.start_fret || 1
+  const startFret = chord.start_fret || 1;
 
   // Detect barres: same finger on same fret across multiple strings
   const detectBarres = (): Barre[] => {
-    const barres: Barre[] = []
-    const fingerPositions: Map<string, number[]> = new Map()
+    const barres: Barre[] = [];
+    const fingerPositions: Map<string, number[]> = new Map();
 
     // Group strings by finger+fret combination
     chord.strings.forEach((string, i) => {
-      if (string.fret !== 'x' && string.fret !== 0 && string.finger) {
-        const key = `${string.finger}-${string.fret}`
+      if (string.fret !== "x" && string.fret !== 0 && string.finger) {
+        const key = `${string.finger}-${string.fret}`;
         if (!fingerPositions.has(key)) {
-          fingerPositions.set(key, [])
+          fingerPositions.set(key, []);
         }
-        fingerPositions.get(key)!.push(i)
+        fingerPositions.get(key)!.push(i);
       }
-    })
+    });
 
     // Create barre spanning from first to last string with same finger+fret
     fingerPositions.forEach((strings, key) => {
       if (strings.length >= 2) {
-        const [finger, fret] = key.split('-').map(Number)
-        const minString = Math.min(...strings)
-        const maxString = Math.max(...strings)
+        const [finger, fret] = key.split("-").map(Number);
+        const minString = Math.min(...strings);
+        const maxString = Math.max(...strings);
 
         barres.push({
           fret,
           finger,
           fromString: minString,
           toString: maxString,
-        })
+        });
       }
-    })
+    });
 
-    return barres
-  }
+    return barres;
+  };
 
-  const barres = detectBarres()
+  const barres = detectBarres();
 
   // Check if a string position is covered by a barre
   const isInBarre = (stringIndex: number, fret: number): boolean => {
     return barres.some(
-      b => b.fret === fret && stringIndex >= b.fromString && stringIndex <= b.toString
-    )
-  }
+      (b) =>
+        b.fret === fret &&
+        stringIndex >= b.fromString &&
+        stringIndex <= b.toString,
+    );
+  };
 
-  const radius = Math.min(14, stringSpacing * 0.4, fretSpacing * 0.35)
+  const radius = Math.min(14, stringSpacing * 0.4, fretSpacing * 0.35);
 
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
@@ -139,12 +147,12 @@ export default function ChordDiagram({ chord, width = 160, height = 200 }: Chord
 
       {/* Draw barres */}
       {barres.map((barre, i) => {
-        const fretNum = startFret > 1 ? barre.fret - startFret + 1 : barre.fret
-        const y = getFretY(fretNum) - fretSpacing / 2
-        const x1 = getStringX(barre.fromString)
-        const x2 = getStringX(barre.toString)
-        const barreWidth = x2 - x1
-        const barreHeight = radius * 2
+        const fretNum = startFret > 1 ? barre.fret - startFret + 1 : barre.fret;
+        const y = getFretY(fretNum) - fretSpacing / 2;
+        const x1 = getStringX(barre.fromString);
+        const x2 = getStringX(barre.toString);
+        const barreWidth = x2 - x1;
+        const barreHeight = radius * 2;
 
         return (
           <g key={`barre-${i}`}>
@@ -168,17 +176,17 @@ export default function ChordDiagram({ chord, width = 160, height = 200 }: Chord
               {barre.finger}
             </text>
           </g>
-        )
+        );
       })}
 
       {/* String markers (X, O, and finger positions) */}
       {chord.strings.map((string, i) => {
-        const x = getStringX(i)
+        const x = getStringX(i);
 
-        if (string.fret === 'x') {
+        if (string.fret === "x") {
           // Muted string - draw X
-          const size = Math.min(8, radius * 0.6)
-          const y = padding.top - 18
+          const size = Math.min(8, radius * 0.6);
+          const y = padding.top - 18;
           return (
             <g key={`marker-${i}`}>
               <line
@@ -200,7 +208,7 @@ export default function ChordDiagram({ chord, width = 160, height = 200 }: Chord
                 strokeLinecap="round"
               />
             </g>
-          )
+          );
         }
 
         if (string.fret === 0) {
@@ -215,28 +223,22 @@ export default function ChordDiagram({ chord, width = 160, height = 200 }: Chord
               stroke={mutedColor}
               strokeWidth={2}
             />
-          )
+          );
         }
 
         // Skip if this position is part of a barre
         if (isInBarre(i, string.fret)) {
-          return null
+          return null;
         }
 
         // Fretted note - draw filled circle with finger number
-        const fretNum = startFret > 1
-          ? string.fret - startFret + 1
-          : string.fret
-        const y = getFretY(fretNum) - fretSpacing / 2
+        const fretNum =
+          startFret > 1 ? string.fret - startFret + 1 : string.fret;
+        const y = getFretY(fretNum) - fretSpacing / 2;
 
         return (
           <g key={`marker-${i}`}>
-            <circle
-              cx={x}
-              cy={y}
-              r={radius}
-              fill={fingerColor}
-            />
+            <circle cx={x} cy={y} r={radius} fill={fingerColor} />
             {string.finger && (
               <text
                 x={x}
@@ -250,8 +252,8 @@ export default function ChordDiagram({ chord, width = 160, height = 200 }: Chord
               </text>
             )}
           </g>
-        )
+        );
       })}
     </svg>
-  )
+  );
 }

@@ -8,11 +8,11 @@ export class ChordsService {
   constructor(private readonly db: DatabaseService) {}
 
   async findAll(search?: string): Promise<ChordDto[]> {
-    let query = 'SELECT * FROM chords ORDER BY name';
+    let query = 'SELECT * FROM chords ORDER BY usage_count DESC, name ASC';
     let params: any[] = [];
 
     if (search) {
-      query = 'SELECT * FROM chords WHERE LOWER(name) LIKE $1 ORDER BY name';
+      query = 'SELECT * FROM chords WHERE LOWER(name) LIKE $1 ORDER BY usage_count DESC, name ASC';
       params = [`%${search.toLowerCase()}%`];
     }
 
@@ -80,5 +80,27 @@ export class ChordsService {
     }
 
     return result.rows[0];
+  }
+
+  async incrementUsageCount(chordIds: number[]): Promise<void> {
+    if (chordIds.length === 0) return;
+
+    // Increment usage_count for each chord
+    const placeholders = chordIds.map((_, i) => `$${i + 1}`).join(',');
+    await this.db.query(
+      `UPDATE chords SET usage_count = usage_count + 1 WHERE id IN (${placeholders})`,
+      chordIds
+    );
+  }
+
+  async decrementUsageCount(chordIds: number[]): Promise<void> {
+    if (chordIds.length === 0) return;
+
+    // Decrement usage_count for each chord, but don't go below 0
+    const placeholders = chordIds.map((_, i) => `$${i + 1}`).join(',');
+    await this.db.query(
+      `UPDATE chords SET usage_count = GREATEST(usage_count - 1, 0) WHERE id IN (${placeholders})`,
+      chordIds
+    );
   }
 }

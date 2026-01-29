@@ -1,34 +1,82 @@
+import { NavLink } from 'react-router-dom'
+
 export type TabType = 'chords' | 'songs' | 'favorites'
 
 interface TabNavProps {
-  activeTab: TabType
-  onTabChange: (tab: TabType) => void
   showFavorites: boolean
+  user: { username: string } | null
+  onLoginClick: () => void
+  onLogout: () => void
 }
 
-export default function TabNav({ activeTab, onTabChange, showFavorites }: TabNavProps) {
+export default function TabNav({ showFavorites, user, onLoginClick, onLogout }: TabNavProps) {
   return (
-    <div className="tab-nav">
-      <button
-        className={`tab-btn ${activeTab === 'chords' ? 'active' : ''}`}
-        onClick={() => onTabChange('chords')}
-      >
-        Chords
-      </button>
-      <button
-        className={`tab-btn ${activeTab === 'songs' ? 'active' : ''}`}
-        onClick={() => onTabChange('songs')}
-      >
-        Songs
-      </button>
-      {showFavorites && (
-        <button
-          className={`tab-btn ${activeTab === 'favorites' ? 'active' : ''}`}
-          onClick={() => onTabChange('favorites')}
-        >
-          Favorites
-        </button>
-      )}
-    </div>
+    <nav className="bg-deep-navy rounded-xl mb-6 px-8 py-4">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-off-white">Pick Chords</h1>
+
+        <div className="flex gap-8 items-center">
+          <NavLink
+            to="/chords"
+            className={({ isActive }) =>
+              `px-6 py-2 text-sm font-medium uppercase tracking-wider cursor-pointer transition-all duration-200 no-underline ${
+                isActive
+                  ? 'text-off-white border-b-2 border-coral'
+                  : 'text-cream hover:text-off-white'
+              }`
+            }
+          >
+            Chords
+          </NavLink>
+          <NavLink
+            to="/songs"
+            className={({ isActive }) =>
+              `px-6 py-2 text-sm font-medium uppercase tracking-wider cursor-pointer transition-all duration-200 no-underline ${
+                isActive
+                  ? 'text-off-white border-b-2 border-coral'
+                  : 'text-cream hover:text-off-white'
+              }`
+            }
+          >
+            Songs
+          </NavLink>
+          {showFavorites && (
+            <NavLink
+              to="/favorites"
+              className={({ isActive }) =>
+                `px-6 py-2 text-sm font-medium uppercase tracking-wider cursor-pointer transition-all duration-200 no-underline ${
+                  isActive
+                    ? 'text-off-white border-b-2 border-coral'
+                    : 'text-cream hover:text-off-white'
+                }`
+              }
+            >
+              Favorites
+            </NavLink>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          {user ? (
+            <>
+              <span className="text-cream font-medium">{user.username}</span>
+              <button
+                className="px-4 py-2 text-sm rounded-lg font-medium bg-coral text-deep-navy transition-all duration-200 hover:bg-golden-orange border-0 cursor-pointer"
+                onClick={onLogout}
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <button
+              className="px-4 py-2 text-sm rounded-lg font-medium bg-coral text-deep-navy transition-all duration-200 hover:bg-golden-orange border-0 cursor-pointer"
+              onClick={onLoginClick}
+            >
+              Login
+            </button>
+          )}
+        </div>
+      </div>
+    </nav>
   )
 }
