@@ -473,38 +473,19 @@ export function useUpdateProgress() {
       if (previousProgress) {
         const item = previousProgress.find(p => p.song_id === songId)
         if (item) {
-          const oldStatus = item.status
-          const oldPosition = item.position
-
-          // Create new array with updated positions
+          // Simply update the item's status and position immediately
+          // The server will handle proper position management
           const updated = previousProgress.map(p => {
             if (p.song_id === songId) {
               return { ...p, status, position }
             }
-
-            // If status changed
-            if (oldStatus !== status) {
-              // Items in old column after removed item shift down
-              if (p.status === oldStatus && p.position > oldPosition) {
-                return { ...p, position: p.position - 1 }
-              }
-              // Items in new column at or after new position shift up
-              if (p.status === status && p.position >= position) {
-                return { ...p, position: p.position + 1 }
-              }
-            } else {
-              // Same column reorder
-              if (p.status === status) {
-                if (oldPosition < position && p.position > oldPosition && p.position <= position) {
-                  return { ...p, position: p.position - 1 }
-                }
-                if (oldPosition > position && p.position >= position && p.position < oldPosition) {
-                  return { ...p, position: p.position + 1 }
-                }
-              }
-            }
-
             return p
+          })
+
+          // Sort by status and position for correct display
+          updated.sort((a, b) => {
+            if (a.status !== b.status) return 0
+            return a.position - b.position
           })
 
           queryClient.setQueryData<SongProgress[]>(queryKeys.progress(), updated)

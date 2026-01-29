@@ -20,10 +20,10 @@ export default function TabNav({ showFavorites, user, onLoginClick, onLogout }: 
           <NavLink
             to="/chords"
             className={({ isActive }) =>
-              `px-6 py-2 text-sm font-medium uppercase tracking-wider cursor-pointer transition-all duration-200 no-underline ${
+              `px-6 py-2 text-sm font-medium uppercase tracking-wider cursor-pointer transition-all duration-200 no-underline border-b-2 ${
                 isActive
-                  ? 'text-off-white border-b-2 border-coral'
-                  : 'text-cream hover:text-off-white'
+                  ? 'text-off-white border-coral'
+                  : 'text-cream border-transparent hover:text-off-white'
               }`
             }
           >
@@ -32,10 +32,10 @@ export default function TabNav({ showFavorites, user, onLoginClick, onLogout }: 
           <NavLink
             to="/songs"
             className={({ isActive }) =>
-              `px-6 py-2 text-sm font-medium uppercase tracking-wider cursor-pointer transition-all duration-200 no-underline ${
+              `px-6 py-2 text-sm font-medium uppercase tracking-wider cursor-pointer transition-all duration-200 no-underline border-b-2 ${
                 isActive
-                  ? 'text-off-white border-b-2 border-coral'
-                  : 'text-cream hover:text-off-white'
+                  ? 'text-off-white border-coral'
+                  : 'text-cream border-transparent hover:text-off-white'
               }`
             }
           >
@@ -45,10 +45,10 @@ export default function TabNav({ showFavorites, user, onLoginClick, onLogout }: 
             <NavLink
               to="/favorites"
               className={({ isActive }) =>
-                `px-6 py-2 text-sm font-medium uppercase tracking-wider cursor-pointer transition-all duration-200 no-underline ${
+                `px-6 py-2 text-sm font-medium uppercase tracking-wider cursor-pointer transition-all duration-200 no-underline border-b-2 ${
                   isActive
-                    ? 'text-off-white border-b-2 border-coral'
-                    : 'text-cream hover:text-off-white'
+                    ? 'text-off-white border-coral'
+                    : 'text-cream border-transparent hover:text-off-white'
                 }`
               }
             >
@@ -59,10 +59,10 @@ export default function TabNav({ showFavorites, user, onLoginClick, onLogout }: 
             <NavLink
               to="/progress"
               className={({ isActive }) =>
-                `px-6 py-2 text-sm font-medium uppercase tracking-wider cursor-pointer transition-all duration-200 no-underline ${
+                `px-6 py-2 text-sm font-medium uppercase tracking-wider cursor-pointer transition-all duration-200 no-underline border-b-2 ${
                   isActive
-                    ? 'text-off-white border-b-2 border-coral'
-                    : 'text-cream hover:text-off-white'
+                    ? 'text-off-white border-coral'
+                    : 'text-cream border-transparent hover:text-off-white'
                 }`
               }
             >
@@ -73,10 +73,10 @@ export default function TabNav({ showFavorites, user, onLoginClick, onLogout }: 
             <NavLink
               to="/logs"
               className={({ isActive }) =>
-                `px-6 py-2 text-sm font-medium uppercase tracking-wider cursor-pointer transition-all duration-200 no-underline ${
+                `px-6 py-2 text-sm font-medium uppercase tracking-wider cursor-pointer transition-all duration-200 no-underline border-b-2 ${
                   isActive
-                    ? 'text-off-white border-b-2 border-coral'
-                    : 'text-cream hover:text-off-white'
+                    ? 'text-off-white border-coral'
+                    : 'text-cream border-transparent hover:text-off-white'
                 }`
               }
             >

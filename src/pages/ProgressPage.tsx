@@ -10,6 +10,7 @@ import {
   useSensors,
   DragStartEvent,
   DragEndEvent,
+  useDroppable,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -86,11 +87,12 @@ function SortableCard({ item, onRemove, onClick }: { item: SongProgress; onRemov
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+    opacity: isDragging ? 0 : 1,
   }
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <SongCard item={item} isDragging={isDragging} onRemove={onRemove} onClick={onClick} />
+      <SongCard item={item} onRemove={onRemove} onClick={onClick} />
     </div>
   )
 }
@@ -106,6 +108,10 @@ function Column({
   onRemove: (songId: number) => void
   onCardClick: (songId: number) => void
 }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: column.id,
+  })
+
   return (
     <div className="flex-1 min-w-[250px] max-w-[350px]">
       <div className={`${column.color} rounded-t-lg px-4 py-2`}>
@@ -116,7 +122,12 @@ function Column({
           </span>
         </h3>
       </div>
-      <div className="bg-cream/50 rounded-b-lg p-3 min-h-[400px] border-2 border-t-0 border-[#D4C9BC]">
+      <div
+        ref={setNodeRef}
+        className={`bg-cream/50 rounded-b-lg p-3 min-h-[400px] border-2 border-t-0 transition-colors ${
+          isOver ? 'border-teal-green bg-teal-green/10' : 'border-[#D4C9BC]'
+        }`}
+      >
         <SortableContext
           items={items.map(i => `song-${i.song_id}`)}
           strategy={verticalListSortingStrategy}
@@ -131,7 +142,9 @@ function Column({
               />
             ))}
             {items.length === 0 && (
-              <div className="text-center text-light-gray text-sm py-8 border-2 border-dashed border-[#D4C9BC] rounded-lg">
+              <div className={`text-center text-sm py-8 border-2 border-dashed rounded-lg transition-colors ${
+                isOver ? 'border-teal-green text-teal-green' : 'border-[#D4C9BC] text-light-gray'
+              }`}>
                 Drop songs here
               </div>
             )}
@@ -325,7 +338,7 @@ function ProgressPage() {
             ))}
           </div>
 
-          <DragOverlay>
+          <DragOverlay dropAnimation={null}>
             {activeItem && <SongCard item={activeItem} isDragging />}
           </DragOverlay>
         </DndContext>

@@ -10,7 +10,7 @@ function Layout() {
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   return (
-    <div className="mx-auto p-5 rounded-2xl min-h-[calc(100vh-2.5rem)]">
+    <div className="px-8 py-5 min-h-[calc(100vh-2.5rem)]">
       <TabNav
         showFavorites={!!user}
         user={user}
@@ -18,13 +18,15 @@ function Layout() {
         onLogout={logout}
       />
 
-      <Suspense
-        fallback={
-          <div className="text-center py-10 text-light-gray">Loading...</div>
-        }
-      >
-        <Outlet />
-      </Suspense>
+      <div className="max-w-6xl mx-auto px-8 py-5">
+        <Suspense
+          fallback={
+            <div className="text-center py-10 text-light-gray">Loading...</div>
+          }
+        >
+          <Outlet />
+        </Suspense>
+      </div>
 
       {showAuthModal && (
         <Suspense fallback={null}>

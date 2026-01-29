@@ -5,7 +5,7 @@ import ChordsPage from './pages/ChordsPage'
 import SongsPage from './pages/SongsPage'
 import FavoritesPage from './pages/FavoritesPage'
 import NewSongPage from './pages/NewSongPage'
-import StrummingPatternPage from './pages/StrummingPatternPage'
+import EditSongPage from './pages/EditSongPage'
 import LogsPage from './pages/LogsPage'
 import ProgressPage from './pages/ProgressPage'
 import NotFoundPage from './pages/NotFoundPage'
@@ -42,8 +42,8 @@ export const router = createBrowserRouter([
         element: <SongPage />,
       },
       {
-        path: 'songs/:id/strumming',
-        element: <StrummingPatternPage />,
+        path: 'songs/:id/edit',
+        element: <EditSongPage />,
       },
       {
         path: 'favorites',
