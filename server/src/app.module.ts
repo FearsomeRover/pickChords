@@ -6,10 +6,12 @@ import { AuthModule } from './auth/auth.module';
 import { TagsModule } from './tags/tags.module';
 import { SongsModule } from './songs/songs.module';
 import { FavoritesModule } from './favorites/favorites.module';
+import { LogsModule } from './logs/logs.module';
 
 @Module({
   imports: [
     DatabaseModule,
+    LogsModule,
     ChordsModule,
     AuthModule,
     TagsModule,

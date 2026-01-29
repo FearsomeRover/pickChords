@@ -38,12 +38,14 @@ export interface Song {
   tags?: Tag[];
   is_favorite?: boolean;
   strumming_pattern?: StrummingPattern;
+  user_id?: number;
   created_at: string;
 }
 
 export interface User {
   id: number;
   username: string;
+  is_admin: boolean;
 }
 
 export interface AuthState {
@@ -53,4 +55,19 @@ export interface AuthState {
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, password: string) => Promise<void>;
   logout: () => void;
+}
+
+export type LogLevel = 'info' | 'warn' | 'error';
+
+export interface LogEntry {
+  id: number;
+  level: LogLevel;
+  action: string;
+  message: string;
+  user_id: number | null;
+  username: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  metadata: Record<string, any> | null;
+  created_at: string;
 }

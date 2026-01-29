@@ -6,6 +6,7 @@ import SongsPage from './pages/SongsPage'
 import FavoritesPage from './pages/FavoritesPage'
 import NewSongPage from './pages/NewSongPage'
 import StrummingPatternPage from './pages/StrummingPatternPage'
+import LogsPage from './pages/LogsPage'
 import NotFoundPage from './pages/NotFoundPage'
 
 // Lazy load the SongPage component for code splitting
@@ -46,6 +47,10 @@ export const router = createBrowserRouter([
       {
         path: 'favorites',
         element: <FavoritesPage />,
+      },
+      {
+        path: 'logs',
+        element: <LogsPage />,
       },
       {
         path: '*',

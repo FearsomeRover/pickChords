@@ -1,34 +1,41 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Song, Chord } from '../types'
-import { useApi } from '../hooks/useApi'
+import { Chord } from '../types'
 import { useAuth } from '../hooks/useAuth'
+import {
+  useSong,
+  useChords,
+  useReorderChords,
+  useAddChordToSong,
+  useRemoveChordFromSong,
+  useDeleteSong,
+  useToggleFavorite,
+} from '../hooks/useQueries'
 import ChordDiagram from './ChordDiagram'
 import TagChip from './TagChip'
 import StrummingPatternDisplay from './StrummingPatternDisplay'
 
 export default function SongPage() {
-  const api = useApi()
   const { user } = useAuth()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const songId = id ? parseInt(id, 10) : undefined
 
-  const [song, setSong] = useState<Song | null>(null)
-  const [chords, setChords] = useState<Chord[]>([])
-  const [allChords, setAllChords] = useState<Chord[]>([])
+  const { data: song, isLoading, error } = useSong(songId)
+  const { data: allChords = [] } = useChords()
+
+  const reorderMutation = useReorderChords()
+  const addChordMutation = useAddChordToSong()
+  const removeChordMutation = useRemoveChordFromSong()
+  const deleteSongMutation = useDeleteSong()
+  const toggleFavoriteMutation = useToggleFavorite()
+
   const [showChordPicker, setShowChordPicker] = useState(false)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null)
 
-  useEffect(() => {
-    if (id) {
-      fetchSong()
-      fetchAllChords()
-    }
-  }, [id])
+  // Check if user can edit this song (owner or admin)
+  const canEdit = user && song && (song.user_id === user.id || user.is_admin === true)
 
   useEffect(() => {
     const handleClickOutside = () => {
@@ -40,60 +47,54 @@ export default function SongPage() {
     return () => document.removeEventListener('click', handleClickOutside)
   }, [openMenuIndex])
 
-  const fetchSong = async () => {
-    try {
-      setLoading(true)
-      const data = await api.get<Song>(`/api/songs/${id}`)
-      setSong(data)
-      setChords(data.chords || [])
-      setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch song')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchAllChords = async () => {
-    try {
-      const data = await api.get<Chord[]>('/api/chords')
-      setAllChords(data)
-    } catch (err) {
-      console.error('Failed to fetch chords:', err)
-    }
-  }
-
-  const hasChanges = () => {
-    if (!song) return false
-    const originalIds = song.chords?.map(c => c.id) || []
-    const currentIds = chords.map(c => c.id)
-    return JSON.stringify(originalIds) !== JSON.stringify(currentIds)
-  }
+  const chords = song?.chords || []
 
   const moveChord = (fromIndex: number, toIndex: number) => {
-    if (toIndex < 0 || toIndex >= chords.length) return
+    if (!song || !canEdit || toIndex < 0 || toIndex >= chords.length) return
+
     const newChords = [...chords]
     const [moved] = newChords.splice(fromIndex, 1)
     newChords.splice(toIndex, 0, moved)
-    setChords(newChords)
+    const newChordIds = newChords.map(c => c.id)
+
+    // Optimistic update - happens immediately
+    reorderMutation.mutate({
+      songId: song.id,
+      song,
+      newChordIds,
+    })
   }
 
   const removeChord = (index: number) => {
-    const newChords = [...chords]
-    newChords.splice(index, 1)
-    setChords(newChords)
+    if (!song || !canEdit) return
+
+    // Optimistic update
+    removeChordMutation.mutate({
+      songId: song.id,
+      song,
+      chordIndex: index,
+    })
   }
 
   const addChord = (chord: Chord) => {
-    setChords([...chords, chord])
+    if (!song || !canEdit) return
+
+    // Optimistic update
+    addChordMutation.mutate({
+      songId: song.id,
+      song,
+      chord,
+    })
   }
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
+    if (!canEdit) return
     setDraggedIndex(index)
     e.dataTransfer.effectAllowed = 'move'
   }
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
+    if (!canEdit) return
     e.preventDefault()
     if (draggedIndex === null || draggedIndex === index) return
     moveChord(draggedIndex, index)
@@ -104,48 +105,20 @@ export default function SongPage() {
     setDraggedIndex(null)
   }
 
-  const saveChanges = async () => {
-    if (!song) return
-    setSaving(true)
-    try {
-      const newChordIds = chords.map(c => c.id)
-      await api.put(`/api/songs/${song.id}`, {
-        name: song.name,
-        artist: song.artist,
-        notes: song.notes,
-        chord_ids: newChordIds,
-        tag_ids: song.tag_ids,
-      })
-      setSong({ ...song, chords, chord_ids: newChordIds })
-    } catch (err) {
-      alert('Failed to save: ' + (err instanceof Error ? err.message : 'Unknown error'))
-    } finally {
-      setSaving(false)
-    }
+  const handleDelete = () => {
+    if (!song || !canEdit || !confirm('Delete this song?')) return
+    deleteSongMutation.mutate(song.id, {
+      onSuccess: () => navigate(-1),
+      onError: (err) => alert('Failed to delete song: ' + (err instanceof Error ? err.message : 'Unknown error')),
+    })
   }
 
-  const handleDelete = async () => {
-    if (!song || !confirm('Delete this song?')) return
-    try {
-      await api.del(`/api/songs/${song.id}`)
-      navigate(-1)
-    } catch (err) {
-      alert('Failed to delete song: ' + (err instanceof Error ? err.message : 'Unknown error'))
-    }
-  }
-
-  const handleToggleFavorite = async () => {
+  const handleToggleFavorite = () => {
     if (!song || !user) return
-    try {
-      if (song.is_favorite) {
-        await api.del(`/api/songs/${song.id}/favorite`)
-      } else {
-        await api.post(`/api/songs/${song.id}/favorite`, {})
-      }
-      setSong({ ...song, is_favorite: !song.is_favorite })
-    } catch (err) {
-      console.error('Failed to toggle favorite:', err)
-    }
+    toggleFavoriteMutation.mutate({
+      songId: song.id,
+      isFavorite: !!song.is_favorite,
+    })
   }
 
   // Get chords that aren't already in the song
@@ -153,14 +126,14 @@ export default function SongPage() {
     chord => !chords.some(c => c.id === chord.id)
   )
 
-  if (loading) {
+  if (isLoading) {
     return <div className="text-center py-10 text-light-gray">Loading...</div>
   }
 
   if (error || !song) {
     return (
       <div className="text-[#D64545] bg-[rgba(214,69,69,0.1)] border-2 border-[#D64545] rounded-lg text-center p-5">
-        {error || 'Song not found'}
+        {error instanceof Error ? error.message : 'Song not found'}
         <button
           className="mt-4 px-5 py-2.5 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer"
           onClick={() => navigate(-1)}
@@ -190,12 +163,14 @@ export default function SongPage() {
               {song.is_favorite ? '\u2605' : '\u2606'}
             </button>
           )}
-          <button
-            className="px-4 py-2 text-base rounded-lg font-medium bg-off-white text-deep-navy border-2 border-[#D4C9BC] transition-all duration-200 hover:border-deep-navy cursor-pointer"
-            onClick={handleDelete}
-          >
-            Delete
-          </button>
+          {canEdit && (
+            <button
+              className="px-4 py-2 text-base rounded-lg font-medium bg-off-white text-deep-navy border-2 border-[#D4C9BC] transition-all duration-200 hover:border-deep-navy cursor-pointer"
+              onClick={handleDelete}
+            >
+              Delete
+            </button>
+          )}
         </div>
       </div>
 
@@ -219,10 +194,10 @@ export default function SongPage() {
         <div className="mb-6">
           <StrummingPatternDisplay
             pattern={song.strumming_pattern}
-            onEdit={() => navigate(`/songs/${song.id}/strumming`)}
+            onEdit={canEdit ? () => navigate(`/songs/${song.id}/strumming`) : undefined}
           />
         </div>
-      ) : (
+      ) : canEdit ? (
         <div className="bg-off-white rounded-xl p-5 border-2 border-[#D4C9BC] mb-6 flex justify-between items-center">
           <span className="text-light-gray">No strumming pattern set</span>
           <button
@@ -232,20 +207,22 @@ export default function SongPage() {
             Add Strumming Pattern
           </button>
         </div>
-      )}
+      ) : null}
 
       <div className="bg-off-white rounded-xl p-6 border-2 border-[#D4C9BC]">
         <div className="flex justify-between items-center mb-5">
           <h4 className="text-lg font-semibold text-deep-navy">Chords</h4>
-          <button
-            className="px-4 py-2 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer"
-            onClick={() => setShowChordPicker(!showChordPicker)}
-          >
-            {showChordPicker ? 'Done' : 'Add Chords'}
-          </button>
+          {canEdit && (
+            <button
+              className="px-4 py-2 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer"
+              onClick={() => setShowChordPicker(!showChordPicker)}
+            >
+              {showChordPicker ? 'Done' : 'Add Chords'}
+            </button>
+          )}
         </div>
 
-        {showChordPicker && (
+        {showChordPicker && canEdit && (
           <div className="bg-cream rounded-lg p-4 mb-5 border-2 border-[#D4C9BC]">
             <p className="text-deep-navy font-medium mb-3">Select chords to add:</p>
             {availableChords.length === 0 ? (
@@ -271,56 +248,58 @@ export default function SongPage() {
             {chords.map((chord, index) => (
               <div
                 key={`${chord.id}-${index}`}
-                className="bg-cream rounded-lg p-4 text-center border-2 border-[#D4C9BC] transition-all duration-200 relative cursor-move hover:border-teal-green"
-                draggable
+                className={`bg-cream rounded-lg p-4 text-center border-2 border-[#D4C9BC] transition-all duration-200 relative ${canEdit ? 'cursor-move hover:border-teal-green' : ''}`}
+                draggable={!!canEdit}
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragEnd={handleDragEnd}
               >
-                <div className="absolute top-2 right-2">
-                  <button
-                    className="w-8 h-8 flex items-center justify-center bg-off-white text-deep-navy rounded-lg border-2 border-[#D4C9BC] transition-all duration-200 hover:border-deep-navy cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setOpenMenuIndex(openMenuIndex === index ? null : index)
-                    }}
-                  >
-                    &#x22EE;
-                  </button>
-                  {openMenuIndex === index && (
-                    <div className="absolute right-0 top-10 bg-off-white rounded-lg shadow-lg border-2 border-[#D4C9BC] z-10 min-w-[140px]">
-                      <button
-                        className="w-full px-4 py-2 text-left text-sm text-deep-navy hover:bg-cream transition-all duration-200 border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                        onClick={() => {
-                          moveChord(index, index - 1)
-                          setOpenMenuIndex(null)
-                        }}
-                        disabled={index === 0}
-                      >
-                        Move Up
-                      </button>
-                      <button
-                        className="w-full px-4 py-2 text-left text-sm text-deep-navy hover:bg-cream transition-all duration-200 border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                        onClick={() => {
-                          moveChord(index, index + 1)
-                          setOpenMenuIndex(null)
-                        }}
-                        disabled={index === chords.length - 1}
-                      >
-                        Move Down
-                      </button>
-                      <button
-                        className="w-full px-4 py-2 text-left text-sm text-[#D64545] hover:bg-cream transition-all duration-200 border-0 cursor-pointer"
-                        onClick={() => {
-                          removeChord(index)
-                          setOpenMenuIndex(null)
-                        }}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                </div>
+                {canEdit && (
+                  <div className="absolute top-2 right-2">
+                    <button
+                      className="w-8 h-8 flex items-center justify-center bg-off-white text-deep-navy rounded-lg border-2 border-[#D4C9BC] transition-all duration-200 hover:border-deep-navy cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setOpenMenuIndex(openMenuIndex === index ? null : index)
+                      }}
+                    >
+                      &#x22EE;
+                    </button>
+                    {openMenuIndex === index && (
+                      <div className="absolute right-0 top-10 bg-off-white rounded-lg shadow-lg border-2 border-[#D4C9BC] z-10 min-w-[140px]">
+                        <button
+                          className="w-full px-4 py-2 text-left text-sm text-deep-navy hover:bg-cream transition-all duration-200 border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          onClick={() => {
+                            moveChord(index, index - 1)
+                            setOpenMenuIndex(null)
+                          }}
+                          disabled={index === 0}
+                        >
+                          Move Up
+                        </button>
+                        <button
+                          className="w-full px-4 py-2 text-left text-sm text-deep-navy hover:bg-cream transition-all duration-200 border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          onClick={() => {
+                            moveChord(index, index + 1)
+                            setOpenMenuIndex(null)
+                          }}
+                          disabled={index === chords.length - 1}
+                        >
+                          Move Down
+                        </button>
+                        <button
+                          className="w-full px-4 py-2 text-left text-sm text-[#D64545] hover:bg-cream transition-all duration-200 border-0 cursor-pointer"
+                          onClick={() => {
+                            removeChord(index)
+                            setOpenMenuIndex(null)
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <h3 className="text-xl font-semibold text-teal-green mb-3">{chord.name}</h3>
                 <div className="flex justify-center">
                   <ChordDiagram chord={chord} width={180} height={220} />
@@ -330,20 +309,7 @@ export default function SongPage() {
           </div>
         ) : (
           <div className="text-center text-light-gray text-lg py-6">
-            No chords added to this song yet. Click "Add Chords" to get started.
-          </div>
-        )}
-
-        {hasChanges() && (
-          <div className="flex justify-between items-center bg-mustard-yellow rounded-lg p-4 mt-5">
-            <span className="text-deep-navy font-medium">You have unsaved changes</span>
-            <button
-              className="px-5 py-2.5 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={saveChanges}
-              disabled={saving}
-            >
-              {saving ? 'Saving...' : 'Save Changes'}
-            </button>
+            No chords added to this song yet.{canEdit && ' Click "Add Chords" to get started.'}
           </div>
         )}
       </div>

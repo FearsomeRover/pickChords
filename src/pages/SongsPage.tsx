@@ -1,15 +1,13 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Song, Tag } from '../types'
-import { useApi } from '../hooks/useApi'
 import { useAuth } from '../hooks/useAuth'
+import { useSongs, useTags, useToggleFavorite } from '../hooks/useQueries'
 import SongCard from '../components/SongCard'
 import TagChip from '../components/TagChip'
 
 const AuthModal = lazy(() => import('../components/AuthModal'))
 
 function SongsPage() {
-  const api = useApi()
   const { user } = useAuth()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -18,67 +16,28 @@ function SongsPage() {
   const tagIdParam = searchParams.get('tag')
   const selectedTagId = tagIdParam ? parseInt(tagIdParam, 10) : null
 
-  const [songs, setSongs] = useState<Song[]>([])
-  const [tags, setTags] = useState<Tag[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm)
 
-  const fetchSongs = useCallback(async (search = '', tagId: number | null = null) => {
-    try {
-      setLoading(true)
-      let url = '/api/songs?'
-      const params: string[] = []
-      if (search) params.push(`search=${encodeURIComponent(search)}`)
-      if (tagId) params.push(`tag=${tagId}`)
-      url += params.join('&')
-
-      const data = await api.get<Song[]>(url)
-      setSongs(data)
-      setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch songs')
-    } finally {
-      setLoading(false)
-    }
-  }, [api])
-
-  const fetchTags = useCallback(async () => {
-    try {
-      const data = await api.get<Tag[]>('/api/tags')
-      setTags(data)
-    } catch (err) {
-      console.error('Failed to fetch tags:', err)
-    }
-  }, [api])
-
-  // Fetch songs and tags on mount
-  useEffect(() => {
-    Promise.all([fetchSongs(searchTerm, selectedTagId), fetchTags()])
-  }, [])
-
-  // Debounced search
-  useEffect(() => {
-    const timer = setTimeout(() => fetchSongs(searchTerm, selectedTagId), 300)
+  // Debounce search
+  useState(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300)
     return () => clearTimeout(timer)
-  }, [searchTerm, selectedTagId, fetchSongs])
+  })
 
-  const handleToggleFavorite = async (song: Song) => {
+  const { data: songs = [], isLoading, error } = useSongs({
+    search: debouncedSearch,
+    tag: selectedTagId,
+  })
+  const { data: tags = [] } = useTags()
+  const toggleFavoriteMutation = useToggleFavorite()
+
+  const handleToggleFavorite = (songId: number, isFavorite: boolean) => {
     if (!user) {
       setShowAuthModal(true)
       return
     }
-
-    try {
-      if (song.is_favorite) {
-        await api.del(`/api/songs/${song.id}/favorite`)
-      } else {
-        await api.post(`/api/songs/${song.id}/favorite`, {})
-      }
-      fetchSongs(searchTerm, selectedTagId)
-    } catch (err) {
-      console.error('Failed to toggle favorite:', err)
-    }
+    toggleFavoriteMutation.mutate({ songId, isFavorite })
   }
 
   const handleSearchChange = (value: string) => {
@@ -89,6 +48,8 @@ function SongsPage() {
       newParams.delete('search')
     }
     setSearchParams(newParams)
+    // Update debounced search after a delay
+    setTimeout(() => setDebouncedSearch(value), 300)
   }
 
   const handleTagSelect = (tagId: number | null) => {
@@ -101,7 +62,7 @@ function SongsPage() {
     setSearchParams(newParams)
   }
 
-  if (loading && songs.length === 0) {
+  if (isLoading && songs.length === 0) {
     return <div className="text-center py-10 text-light-gray">Loading...</div>
   }
 
@@ -143,7 +104,7 @@ function SongsPage() {
 
       {error && (
         <div className="text-[#D64545] bg-[rgba(214,69,69,0.1)] border-2 border-[#D64545] rounded-lg text-center p-5">
-          Error: {error}
+          Error: {error instanceof Error ? error.message : 'Failed to load songs'}
         </div>
       )}
 
@@ -157,7 +118,7 @@ function SongsPage() {
             <SongCard
               key={song.id}
               song={song}
-              onFavorite={user ? () => handleToggleFavorite(song) : undefined}
+              onFavorite={user ? () => handleToggleFavorite(song.id, !!song.is_favorite) : undefined}
               isFavorite={song.is_favorite}
             />
           ))}

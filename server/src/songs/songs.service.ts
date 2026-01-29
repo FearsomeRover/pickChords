@@ -19,6 +19,7 @@ export interface Song {
   chord_ids: number[];
   tag_ids: number[];
   strumming_pattern?: StrummingPattern;
+  user_id?: number;
   created_at: string;
 }
 
@@ -111,12 +112,17 @@ export class SongsService {
     return song;
   }
 
-  async create(createSongDto: CreateSongDto): Promise<Song> {
+  async findOneRaw(id: number): Promise<Song | null> {
+    const result = await this.db.query('SELECT * FROM songs WHERE id = $1', [id]);
+    return result.rows[0] || null;
+  }
+
+  async create(createSongDto: CreateSongDto, userId: number): Promise<Song> {
     const { name, artist, notes, chord_ids = [], tag_ids = [], strumming_pattern } = createSongDto;
 
     const result = await this.db.query(
-      `INSERT INTO songs (name, artist, notes, chord_ids, tag_ids, strumming_pattern)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO songs (name, artist, notes, chord_ids, tag_ids, strumming_pattern, user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
       [
         name,
@@ -124,7 +130,8 @@ export class SongsService {
         notes || null,
         JSON.stringify(chord_ids),
         JSON.stringify(tag_ids),
-        strumming_pattern ? JSON.stringify(strumming_pattern) : null
+        strumming_pattern ? JSON.stringify(strumming_pattern) : null,
+        userId
       ]
     );
 

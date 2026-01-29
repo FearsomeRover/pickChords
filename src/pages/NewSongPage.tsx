@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Chord, Tag, Song } from '../types'
-import { useApi } from '../hooks/useApi'
+import { Song } from '../types'
+import { useChords, useTags, useCreateSong, useCreateTag } from '../hooks/useQueries'
 import TagChip from '../components/TagChip'
 
 export default function NewSongPage() {
@@ -11,40 +11,26 @@ export default function NewSongPage() {
   const [notes, setNotes] = useState('')
   const [selectedChordIds, setSelectedChordIds] = useState<number[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([])
-  const [chords, setChords] = useState<Chord[]>([])
-  const [tags, setTags] = useState<Tag[]>([])
   const [newTagName, setNewTagName] = useState('')
   const [newTagColor, setNewTagColor] = useState('#5b8bd4')
-  const [loading, setLoading] = useState(false)
-  const api = useApi()
 
-  useEffect(() => {
-    loadChordsAndTags()
-  }, [])
+  const { data: chords = [] } = useChords()
+  const { data: tags = [] } = useTags()
+  const createSongMutation = useCreateSong()
+  const createTagMutation = useCreateTag()
 
-  const loadChordsAndTags = async () => {
-    try {
-      const [chordsData, tagsData] = await Promise.all([
-        api.get<Chord[]>('/api/chords'),
-        api.get<Tag[]>('/api/tags'),
-      ])
-      setChords(chordsData)
-      setTags(tagsData)
-    } catch (err) {
-      console.error('Failed to load chords/tags:', err)
-    }
-  }
-
-  const handleAddTag = async () => {
+  const handleAddTag = () => {
     if (!newTagName.trim()) return
-    try {
-      const tag = await api.post<Tag>('/api/tags', { name: newTagName.trim(), color: newTagColor })
-      setTags([...tags, tag])
-      setSelectedTagIds([...selectedTagIds, tag.id])
-      setNewTagName('')
-    } catch (err) {
-      console.error('Failed to add tag:', err)
-    }
+    createTagMutation.mutate(
+      { name: newTagName.trim(), color: newTagColor },
+      {
+        onSuccess: (tag) => {
+          setSelectedTagIds([...selectedTagIds, tag.id])
+          setNewTagName('')
+        },
+        onError: (err) => console.error('Failed to add tag:', err),
+      }
+    )
   }
 
   const toggleChord = (chordId: number) => {
@@ -63,24 +49,24 @@ export default function NewSongPage() {
     )
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!name.trim()) return
-    setLoading(true)
-    try {
-      const song = await api.post<Song>('/api/songs', {
+    createSongMutation.mutate(
+      {
         name: name.trim(),
         artist: artist.trim() || undefined,
         notes: notes.trim() || undefined,
         chord_ids: selectedChordIds,
         tag_ids: selectedTagIds,
-      })
-      navigate(`/songs/${song.id}`)
-    } catch (err) {
-      console.error('Failed to add song:', err)
-      alert('Failed to add song')
-    } finally {
-      setLoading(false)
-    }
+      },
+      {
+        onSuccess: (song: Song) => navigate(`/songs/${song.id}`),
+        onError: (err) => {
+          console.error('Failed to add song:', err)
+          alert('Failed to add song')
+        },
+      }
+    )
   }
 
   return (
@@ -179,8 +165,9 @@ export default function NewSongPage() {
               type="button"
               className="px-4 py-2 text-sm rounded-lg font-medium bg-off-white text-deep-navy border-2 border-[#D4C9BC] transition-all duration-200 hover:border-deep-navy cursor-pointer"
               onClick={handleAddTag}
+              disabled={createTagMutation.isPending}
             >
-              Add Tag
+              {createTagMutation.isPending ? 'Adding...' : 'Add Tag'}
             </button>
           </div>
         </div>
@@ -195,9 +182,9 @@ export default function NewSongPage() {
           <button
             className="px-5 py-2.5 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleSubmit}
-            disabled={loading || !name.trim()}
+            disabled={createSongMutation.isPending || !name.trim()}
           >
-            {loading ? 'Creating...' : 'Create Song'}
+            {createSongMutation.isPending ? 'Creating...' : 'Create Song'}
           </button>
         </div>
       </div>

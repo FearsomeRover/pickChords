@@ -1,13 +1,11 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { useSearchParams, Navigate, useNavigate } from 'react-router-dom'
-import { Song, Tag } from '../types'
-import { useApi } from '../hooks/useApi'
 import { useAuth } from '../hooks/useAuth'
+import { useSongs, useTags, useToggleFavorite } from '../hooks/useQueries'
 import SongCard from '../components/SongCard'
 import TagChip from '../components/TagChip'
 
 function FavoritesPage() {
-  const api = useApi()
   const { user } = useAuth()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -16,68 +14,23 @@ function FavoritesPage() {
   const tagIdParam = searchParams.get('tag')
   const selectedTagId = tagIdParam ? parseInt(tagIdParam, 10) : null
 
-  const [songs, setSongs] = useState<Song[]>([])
-  const [tags, setTags] = useState<Tag[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm)
 
   // Redirect if not logged in
   if (!user) {
     return <Navigate to="/songs" replace />
   }
 
-  const fetchSongs = useCallback(async (search = '', tagId: number | null = null) => {
-    try {
-      setLoading(true)
-      let url = '/api/songs?favorites=true'
-      const params: string[] = []
-      if (search) params.push(`search=${encodeURIComponent(search)}`)
-      if (tagId) params.push(`tag=${tagId}`)
-      if (params.length > 0) {
-        url += '&' + params.join('&')
-      }
+  const { data: songs = [], isLoading, error } = useSongs({
+    search: debouncedSearch,
+    tag: selectedTagId,
+    favorites: true,
+  })
+  const { data: tags = [] } = useTags()
+  const toggleFavoriteMutation = useToggleFavorite()
 
-      const data = await api.get<Song[]>(url)
-      setSongs(data)
-      setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch favorites')
-    } finally {
-      setLoading(false)
-    }
-  }, [api])
-
-  const fetchTags = useCallback(async () => {
-    try {
-      const data = await api.get<Tag[]>('/api/tags')
-      setTags(data)
-    } catch (err) {
-      console.error('Failed to fetch tags:', err)
-    }
-  }, [api])
-
-  // Fetch songs and tags on mount
-  useEffect(() => {
-    Promise.all([fetchSongs(searchTerm, selectedTagId), fetchTags()])
-  }, [])
-
-  // Debounced search
-  useEffect(() => {
-    const timer = setTimeout(() => fetchSongs(searchTerm, selectedTagId), 300)
-    return () => clearTimeout(timer)
-  }, [searchTerm, selectedTagId, fetchSongs])
-
-  const handleToggleFavorite = async (song: Song) => {
-    try {
-      if (song.is_favorite) {
-        await api.del(`/api/songs/${song.id}/favorite`)
-      } else {
-        await api.post(`/api/songs/${song.id}/favorite`, {})
-      }
-      fetchSongs(searchTerm, selectedTagId)
-    } catch (err) {
-      console.error('Failed to toggle favorite:', err)
-    }
+  const handleToggleFavorite = (songId: number, isFavorite: boolean) => {
+    toggleFavoriteMutation.mutate({ songId, isFavorite })
   }
 
   const handleSearchChange = (value: string) => {
@@ -88,6 +41,7 @@ function FavoritesPage() {
       newParams.delete('search')
     }
     setSearchParams(newParams)
+    setTimeout(() => setDebouncedSearch(value), 300)
   }
 
   const handleTagSelect = (tagId: number | null) => {
@@ -100,7 +54,7 @@ function FavoritesPage() {
     setSearchParams(newParams)
   }
 
-  if (loading && songs.length === 0) {
+  if (isLoading && songs.length === 0) {
     return <div className="text-center py-10 text-light-gray">Loading...</div>
   }
 
@@ -142,7 +96,7 @@ function FavoritesPage() {
 
       {error && (
         <div className="text-[#D64545] bg-[rgba(214,69,69,0.1)] border-2 border-[#D64545] rounded-lg text-center p-5">
-          Error: {error}
+          Error: {error instanceof Error ? error.message : 'Failed to load favorites'}
         </div>
       )}
 
@@ -156,7 +110,7 @@ function FavoritesPage() {
             <SongCard
               key={song.id}
               song={song}
-              onFavorite={() => handleToggleFavorite(song)}
+              onFavorite={() => handleToggleFavorite(song.id, !!song.is_favorite)}
               isFavorite={song.is_favorite}
             />
           ))}

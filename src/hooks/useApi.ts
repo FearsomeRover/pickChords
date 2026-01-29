@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react'
 import { useAuth } from './useAuth'
 
 // Use VITE_API_URL if set (for local dev), otherwise use base URL
@@ -7,7 +8,7 @@ const API_URL = import.meta.env.VITE_API_URL || (BASE_URL.endsWith('/') ? BASE_U
 export function useApi() {
   const { token } = useAuth()
 
-  const headers = (): HeadersInit => {
+  const getHeaders = useCallback((): HeadersInit => {
     const h: HeadersInit = {
       'Content-Type': 'application/json',
     }
@@ -15,21 +16,21 @@ export function useApi() {
       h['Authorization'] = `Bearer ${token}`
     }
     return h
-  }
+  }, [token])
 
-  const get = async <T>(path: string): Promise<T> => {
-    const res = await fetch(`${API_URL}${path}`, { headers: headers() })
+  const get = useCallback(async <T>(path: string): Promise<T> => {
+    const res = await fetch(`${API_URL}${path}`, { headers: getHeaders() })
     if (!res.ok) {
       const error = await res.json().catch(() => ({}))
       throw new Error(error.message || 'Request failed')
     }
     return res.json()
-  }
+  }, [getHeaders])
 
-  const post = async <T>(path: string, body: unknown): Promise<T> => {
+  const post = useCallback(async <T>(path: string, body: unknown): Promise<T> => {
     const res = await fetch(`${API_URL}${path}`, {
       method: 'POST',
-      headers: headers(),
+      headers: getHeaders(),
       body: JSON.stringify(body),
     })
     if (!res.ok) {
@@ -37,12 +38,12 @@ export function useApi() {
       throw new Error(error.message || 'Request failed')
     }
     return res.json()
-  }
+  }, [getHeaders])
 
-  const put = async <T>(path: string, body: unknown): Promise<T> => {
+  const put = useCallback(async <T>(path: string, body: unknown): Promise<T> => {
     const res = await fetch(`${API_URL}${path}`, {
       method: 'PUT',
-      headers: headers(),
+      headers: getHeaders(),
       body: JSON.stringify(body),
     })
     if (!res.ok) {
@@ -50,19 +51,19 @@ export function useApi() {
       throw new Error(error.message || 'Request failed')
     }
     return res.json()
-  }
+  }, [getHeaders])
 
-  const del = async <T>(path: string): Promise<T> => {
+  const del = useCallback(async <T>(path: string): Promise<T> => {
     const res = await fetch(`${API_URL}${path}`, {
       method: 'DELETE',
-      headers: headers(),
+      headers: getHeaders(),
     })
     if (!res.ok) {
       const error = await res.json().catch(() => ({}))
       throw new Error(error.message || 'Request failed')
     }
     return res.json()
-  }
+  }, [getHeaders])
 
-  return { get, post, put, del }
+  return useMemo(() => ({ get, post, put, del }), [get, post, put, del])
 }

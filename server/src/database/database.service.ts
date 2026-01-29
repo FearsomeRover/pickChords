@@ -61,8 +61,22 @@ export class DatabaseService implements OnModuleInit {
           id SERIAL PRIMARY KEY,
           username VARCHAR(100) NOT NULL UNIQUE,
           password_hash VARCHAR(255) NOT NULL,
+          is_admin BOOLEAN DEFAULT FALSE,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
+      `);
+
+      // Add is_admin column if it doesn't exist (for existing databases)
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name='users' AND column_name='is_admin'
+          ) THEN
+            ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE;
+          END IF;
+        END $$;
       `);
 
       // Create tags table
@@ -85,6 +99,7 @@ export class DatabaseService implements OnModuleInit {
           chord_ids JSONB NOT NULL DEFAULT '[]',
           tag_ids JSONB NOT NULL DEFAULT '[]',
           strumming_pattern JSONB,
+          user_id INTEGER REFERENCES users(id),
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `);
@@ -102,6 +117,19 @@ export class DatabaseService implements OnModuleInit {
         END $$;
       `);
 
+      // Add user_id column if it doesn't exist (for existing databases)
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name='songs' AND column_name='user_id'
+          ) THEN
+            ALTER TABLE songs ADD COLUMN user_id INTEGER REFERENCES users(id);
+          END IF;
+        END $$;
+      `);
+
       // Create favorites table
       await client.query(`
         CREATE TABLE IF NOT EXISTS favorites (
@@ -111,6 +139,34 @@ export class DatabaseService implements OnModuleInit {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           UNIQUE(user_id, song_id)
         )
+      `);
+
+      // Create logs table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS logs (
+          id SERIAL PRIMARY KEY,
+          level VARCHAR(20) NOT NULL,
+          action VARCHAR(100) NOT NULL,
+          message TEXT NOT NULL,
+          user_id INTEGER REFERENCES users(id),
+          username VARCHAR(100),
+          ip_address VARCHAR(45),
+          user_agent TEXT,
+          metadata JSONB,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_logs_created_at ON logs(created_at DESC)
+      `);
+
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level)
+      `);
+
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_logs_action ON logs(action)
       `);
 
       // Check if we have any chords, if not insert defaults

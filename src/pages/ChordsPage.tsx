@@ -1,20 +1,24 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Chord, StringData } from '../types'
-import { useApi } from '../hooks/useApi'
+import { useAuth } from '../hooks/useAuth'
+import { useChords, useCreateChord, useUpdateChord, useDeleteChord } from '../hooks/useQueries'
 import ChordDiagram from '../components/ChordDiagram'
 
 function ChordsPage() {
-  const api = useApi()
+  const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const searchTerm = searchParams.get('search') || ''
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm)
 
-  const [chords, setChords] = useState<Chord[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { data: chords = [], isLoading, error } = useChords(debouncedSearch)
+  const createChordMutation = useCreateChord()
+  const updateChordMutation = useUpdateChord()
+  const deleteChordMutation = useDeleteChord()
 
   // Modals
   const [showChordModal, setShowChordModal] = useState(false)
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null)
 
   // Chord form (for add/edit)
   const [editingChordId, setEditingChordId] = useState<number | null>(null)
@@ -28,32 +32,18 @@ function ChordsPage() {
     rawInputs: Array(6).fill('0'),
   })
 
-  const fetchChords = useCallback(async (search = '') => {
-    try {
-      setLoading(true)
-      const url = search
-        ? `/api/chords?search=${encodeURIComponent(search)}`
-        : '/api/chords'
-      const data = await api.get<Chord[]>(url)
-      setChords(data)
-      setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch chords')
-    } finally {
-      setLoading(false)
+  const isAdmin = user?.is_admin === true
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (openMenuId !== null) {
+        setOpenMenuId(null)
+      }
     }
-  }, [api])
-
-  // Fetch chords on mount
-  useEffect(() => {
-    fetchChords(searchTerm)
-  }, [])
-
-  // Debounced search
-  useEffect(() => {
-    const timer = setTimeout(() => fetchChords(searchTerm), 300)
-    return () => clearTimeout(timer)
-  }, [searchTerm, fetchChords])
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [openMenuId])
 
   const parseStringInput = (value: string): StringData => {
     const trimmed = value.trim().toLowerCase()
@@ -100,6 +90,7 @@ function ChordsPage() {
       rawInputs: chord.strings.map(getStringDisplayValue),
     })
     setShowChordModal(true)
+    setOpenMenuId(null)
   }
 
   const closeChordModal = () => {
@@ -108,38 +99,37 @@ function ChordsPage() {
     setChordForm({ name: '', strings: Array(6).fill({ fret: 0 }), rawInputs: Array(6).fill('0') })
   }
 
-  const handleSaveChord = async () => {
+  const handleSaveChord = () => {
     if (!chordForm.name.trim()) return
 
-    try {
-      if (editingChordId) {
-        await api.put(`/api/chords/${editingChordId}`, {
-          name: chordForm.name.trim(),
-          strings: chordForm.strings,
-        })
-      } else {
-        await api.post('/api/chords', {
-          name: chordForm.name.trim(),
-          strings: chordForm.strings,
-        })
-      }
+    const data = {
+      name: chordForm.name.trim(),
+      strings: chordForm.strings,
+    }
 
-      closeChordModal()
-      fetchChords(searchTerm)
-    } catch (err) {
-      alert('Failed to save chord: ' + (err instanceof Error ? err.message : 'Unknown error'))
+    if (editingChordId) {
+      updateChordMutation.mutate(
+        { id: editingChordId, ...data },
+        {
+          onSuccess: () => closeChordModal(),
+          onError: (err) => alert('Failed to save chord: ' + (err instanceof Error ? err.message : 'Unknown error')),
+        }
+      )
+    } else {
+      createChordMutation.mutate(data, {
+        onSuccess: () => closeChordModal(),
+        onError: (err) => alert('Failed to save chord: ' + (err instanceof Error ? err.message : 'Unknown error')),
+      })
     }
   }
 
-  const handleDeleteChord = async (id: number) => {
+  const handleDeleteChord = (id: number) => {
     if (!confirm('Delete this chord?')) return
 
-    try {
-      await api.del(`/api/chords/${id}`)
-      fetchChords(searchTerm)
-    } catch (err) {
-      alert('Failed to delete chord: ' + (err instanceof Error ? err.message : 'Unknown error'))
-    }
+    deleteChordMutation.mutate(id, {
+      onError: (err) => alert('Failed to delete chord: ' + (err instanceof Error ? err.message : 'Unknown error')),
+    })
+    setOpenMenuId(null)
   }
 
   const handleSearchChange = (value: string) => {
@@ -148,9 +138,10 @@ function ChordsPage() {
     } else {
       setSearchParams({})
     }
+    setTimeout(() => setDebouncedSearch(value), 300)
   }
 
-  if (loading && chords.length === 0) {
+  if (isLoading && chords.length === 0) {
     return <div className="text-center py-10 text-light-gray">Loading...</div>
   }
 
@@ -168,47 +159,66 @@ function ChordsPage() {
 
       {error && (
         <div className="text-[#D64545] bg-[rgba(214,69,69,0.1)] border-2 border-[#D64545] rounded-lg text-center p-5">
-          Error: {error}
+          Error: {error instanceof Error ? error.message : 'Failed to load chords'}
         </div>
       )}
 
       {chords.length === 0 ? (
         <div className="text-center text-light-gray text-xl py-10">
-          No chords found. Add some chords to get started!
+          No chords found. {isAdmin && 'Add some chords to get started!'}
         </div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-6">
           {chords.map((chord) => (
-            <div key={chord.id} className="bg-off-white rounded-xl p-5 text-center transition-all duration-200 border-2 border-[#D4C9BC] hover:-translate-y-1 hover:shadow-[0_8px_24px_rgba(0,22,45,0.1)] hover:border-deep-navy">
+            <div key={chord.id} className="bg-off-white rounded-xl p-5 text-center transition-all duration-200 border-2 border-[#D4C9BC] hover:-translate-y-1 hover:shadow-[0_8px_24px_rgba(0,22,45,0.1)] hover:border-deep-navy relative">
+              {/* 3-dot menu for admins */}
+              {isAdmin && (
+                <div className="absolute top-3 right-3">
+                  <button
+                    className="w-8 h-8 flex items-center justify-center bg-off-white text-deep-navy rounded-lg border-2 border-[#D4C9BC] transition-all duration-200 hover:border-deep-navy cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setOpenMenuId(openMenuId === chord.id ? null : chord.id)
+                    }}
+                  >
+                    &#x22EE;
+                  </button>
+                  {openMenuId === chord.id && (
+                    <div className="absolute right-0 top-10 bg-off-white rounded-lg shadow-lg border-2 border-[#D4C9BC] z-10 min-w-[120px]">
+                      <button
+                        className="w-full px-4 py-2 text-left text-sm text-deep-navy hover:bg-cream transition-all duration-200 border-0 cursor-pointer"
+                        onClick={() => openEditChordModal(chord)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="w-full px-4 py-2 text-left text-sm text-[#D64545] hover:bg-cream transition-all duration-200 border-0 cursor-pointer"
+                        onClick={() => handleDeleteChord(chord.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
               <h3 className="mb-4 text-2xl text-teal-green">{chord.name}</h3>
               <div className="flex justify-center">
                 <ChordDiagram chord={chord} width={180} height={220} />
-              </div>
-              <div className="flex gap-2 justify-center mt-3">
-                <button
-                  className="text-[0.85rem] px-3 py-1.5 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer"
-                  onClick={() => openEditChordModal(chord)}
-                >
-                  Edit
-                </button>
-                <button
-                  className="text-[0.85rem] px-3 py-1.5 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer"
-                  onClick={() => handleDeleteChord(chord.id)}
-                >
-                  Delete
-                </button>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      <button
-        className="fixed bottom-[30px] right-[30px] w-[60px] h-[60px] rounded-full border-0 bg-deep-navy text-off-white text-3xl cursor-pointer shadow-[0_4px_12px_rgba(0,22,45,0.4)] transition-all duration-200 hover:scale-110 hover:bg-[#001a3d]"
-        onClick={openAddChordModal}
-      >
-        +
-      </button>
+      {/* Only show add button for admins */}
+      {isAdmin && (
+        <button
+          className="fixed bottom-[30px] right-[30px] w-[60px] h-[60px] rounded-full border-0 bg-deep-navy text-off-white text-3xl cursor-pointer shadow-[0_4px_12px_rgba(0,22,45,0.4)] transition-all duration-200 hover:scale-110 hover:bg-[#001a3d]"
+          onClick={openAddChordModal}
+        >
+          +
+        </button>
+      )}
 
       {showChordModal && (
         <div className="fixed inset-0 bg-[rgba(15,27,46,0.7)] backdrop-blur-sm flex items-center justify-center z-[1000]" onClick={closeChordModal}>
@@ -264,8 +274,13 @@ function ChordsPage() {
               <button
                 className="px-5 py-2.5 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] hover:shadow-[0_4px_12px_rgba(0,22,45,0.3)] border-0 cursor-pointer"
                 onClick={handleSaveChord}
+                disabled={createChordMutation.isPending || updateChordMutation.isPending}
               >
-                {editingChordId ? 'Save' : 'Add Chord'}
+                {createChordMutation.isPending || updateChordMutation.isPending
+                  ? 'Saving...'
+                  : editingChordId
+                  ? 'Save'
+                  : 'Add Chord'}
               </button>
             </div>
           </div>

@@ -1,15 +1,16 @@
 import { NavLink } from 'react-router-dom'
 
-export type TabType = 'chords' | 'songs' | 'favorites'
+export type TabType = 'chords' | 'songs' | 'favorites' | 'logs'
 
 interface TabNavProps {
   showFavorites: boolean
-  user: { username: string } | null
+  user: { username: string; is_admin?: boolean } | null
   onLoginClick: () => void
   onLogout: () => void
 }
 
 export default function TabNav({ showFavorites, user, onLoginClick, onLogout }: TabNavProps) {
+  const isAdmin = user?.is_admin === true
   return (
     <nav className="bg-deep-navy rounded-xl mb-6 px-8 py-4">
       <div className="flex justify-between items-center">
@@ -52,6 +53,20 @@ export default function TabNav({ showFavorites, user, onLoginClick, onLogout }: 
               }
             >
               Favorites
+            </NavLink>
+          )}
+          {isAdmin && (
+            <NavLink
+              to="/logs"
+              className={({ isActive }) =>
+                `px-6 py-2 text-sm font-medium uppercase tracking-wider cursor-pointer transition-all duration-200 no-underline ${
+                  isActive
+                    ? 'text-off-white border-b-2 border-coral'
+                    : 'text-cream hover:text-off-white'
+                }`
+              }
+            >
+              Logs
             </NavLink>
           )}
         </div>

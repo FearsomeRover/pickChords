@@ -15,6 +15,7 @@
   "license": "ISC",
   "description": "A personal guitar chord library web application",
   "dependencies": {
+    "@tanstack/react-query": "^5.90.20",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-router-dom": "^7.13.0"
