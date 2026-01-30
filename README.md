@@ -1,6 +1,6 @@
 # PickChords
 
-A self-hosted guitar chord library for organizing your chords and songs.
+A self-hosted guitar chord library for organizing your chords and songs with progress tracking.
 
 ## Features
 
@@ -8,16 +8,28 @@ A self-hosted guitar chord library for organizing your chords and songs.
 - Visual SVG chord diagrams with finger positions
 - Add, edit, and delete custom chords
 - Search by chord name
+- Organized display with reorderable chords
 
 ### Songs
 - Store songs with their associated chords
+- Drag-and-drop chord reordering in edit mode
 - Add artist info and playing notes
 - Tag system with custom colors for categorization
 - Filter songs by tag
+- Strumming pattern editor with visual beats and keyboard shortcuts
 
 ### User Features
-- User accounts with login
+- User accounts with authentication (JWT)
+- Role-based access control (user/admin)
 - Favorite songs for quick access
+- **Progress tracking with Kanban board** (Want to Learn → Learning → Practicing → Mastered)
+- Drag-and-drop song progress management
+- Color-coded progress badges on song pages
+
+### Admin Features
+- System logs with filtering (level, action, user, date range)
+- User activity monitoring
+- Full system access
 
 ## Quick Start
 
@@ -50,6 +62,15 @@ Create a `.env` file with:
 | `JWT_SECRET` | Secret key for authentication |
 | `PORT` | Server port (default: 3000) |
 | `BASE_PATH` | URL base path for subpath deployment |
+
+## Tech Stack
+
+- **Frontend:** React 19, Vite, TypeScript, Tailwind CSS, TanStack Query
+- **Backend:** NestJS 10, TypeScript
+- **Database:** PostgreSQL with JSONB
+- **Auth:** JWT with Passport
+- **Drag & Drop:** @dnd-kit/core
+- **Deployment:** Docker, Nginx
 
 ## License
 
