@@ -1,15 +1,13 @@
-import { useState, lazy, Suspense } from 'react'
+import { useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth'
+import { Plus } from 'lucide-react'
 import { useIsMobile } from '../hooks/useIsMobile'
-import { useSongs, useTags, useToggleFavorite } from '../hooks/useQueries'
+import { useSongs, useTags } from '../hooks/useQueries'
 import SongCard from '../components/SongCard'
 import TagChip from '../components/TagChip'
-
-const AuthModal = lazy(() => import('../components/AuthModal'))
+import ExpandableSearch from '../components/ExpandableSearch'
 
 function SongsPage() {
-  const { user } = useAuth()
   const isMobile = useIsMobile()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -18,7 +16,6 @@ function SongsPage() {
   const tagIdParam = searchParams.get('tag')
   const selectedTagId = tagIdParam ? parseInt(tagIdParam, 10) : null
 
-  const [showAuthModal, setShowAuthModal] = useState(false)
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm)
 
   // Debounce search
@@ -32,15 +29,6 @@ function SongsPage() {
     tag: selectedTagId,
   })
   const { data: tags = [] } = useTags()
-  const toggleFavoriteMutation = useToggleFavorite()
-
-  const handleToggleFavorite = (songId: number, isFavorite: boolean) => {
-    if (!user) {
-      setShowAuthModal(true)
-      return
-    }
-    toggleFavoriteMutation.mutate({ songId, isFavorite })
-  }
 
   const handleSearchChange = (value: string) => {
     const newParams = new URLSearchParams(searchParams)
@@ -71,12 +59,10 @@ function SongsPage() {
   return (
     <>
       <div className="mb-5">
-        <input
-          type="text"
-          className="w-full max-w-md px-4 py-3 text-base border-2 border-[#D4C9BC] rounded-lg bg-off-white text-deep-navy outline-none transition-all duration-200 focus:border-deep-navy focus:shadow-[0_0_0_3px_rgba(0,22,45,0.1)] placeholder:text-light-gray"
-          placeholder="Search songs..."
+        <ExpandableSearch
           value={searchTerm}
-          onChange={(e) => handleSearchChange(e.target.value)}
+          onChange={handleSearchChange}
+          placeholder="Search songs..."
         />
       </div>
 
@@ -120,8 +106,6 @@ function SongsPage() {
             <SongCard
               key={song.id}
               song={song}
-              onFavorite={user ? () => handleToggleFavorite(song.id, !!song.is_favorite) : undefined}
-              isFavorite={song.is_favorite}
             />
           ))}
         </div>
@@ -130,17 +114,12 @@ function SongsPage() {
       {/* Add song button (hidden on mobile) */}
       {!isMobile && (
         <button
-          className="fixed bottom-[30px] right-[30px] w-[60px] h-[60px] rounded-full border-0 bg-deep-navy text-off-white text-3xl cursor-pointer shadow-[0_4px_12px_rgba(0,22,45,0.4)] transition-all duration-200 hover:scale-110 hover:bg-[#001a3d]"
+          className="fixed bottom-[30px] right-[30px] w-[60px] h-[60px] rounded-full border-0 bg-deep-navy text-off-white cursor-pointer shadow-[0_4px_12px_rgba(0,22,45,0.4)] transition-all duration-200 hover:scale-110 hover:bg-[#001a3d] flex items-center justify-center"
           onClick={() => navigate('/songs/new')}
+          title="Add new song"
         >
-          +
+          <Plus size={28} />
         </button>
-      )}
-
-      {showAuthModal && (
-        <Suspense fallback={null}>
-          <AuthModal onClose={() => setShowAuthModal(false)} />
-        </Suspense>
       )}
     </>
   )

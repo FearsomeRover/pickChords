@@ -92,6 +92,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser(null)
   }, [])
 
+  const updateAuth = useCallback((newUser: User, newToken: string) => {
+    localStorage.setItem('token', newToken)
+    setToken(newToken)
+    setUser(newUser)
+  }, [])
+
   const value: AuthState = {
     user,
     token,
@@ -99,6 +105,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     register,
     logout,
+    updateAuth,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

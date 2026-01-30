@@ -3,11 +3,11 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import ChordsPage from './pages/ChordsPage'
 import SongsPage from './pages/SongsPage'
-import FavoritesPage from './pages/FavoritesPage'
 import NewSongPage from './pages/NewSongPage'
 import EditSongPage from './pages/EditSongPage'
 import LogsPage from './pages/LogsPage'
 import ProgressPage from './pages/ProgressPage'
+import ProfilePage from './pages/ProfilePage'
 import NotFoundPage from './pages/NotFoundPage'
 
 // Lazy load the SongPage component for code splitting
@@ -46,16 +46,16 @@ export const router = createBrowserRouter([
         element: <EditSongPage />,
       },
       {
-        path: 'favorites',
-        element: <FavoritesPage />,
-      },
-      {
         path: 'progress',
         element: <ProgressPage />,
       },
       {
         path: 'logs',
         element: <LogsPage />,
+      },
+      {
+        path: 'profile',
+        element: <ProfilePage />,
       },
       {
         path: '*',

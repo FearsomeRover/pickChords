@@ -4,7 +4,7 @@ import { useApi } from './useApi'
 
 // Query keys
 export const queryKeys = {
-  songs: (params?: { search?: string; tag?: number | null; favorites?: boolean }) =>
+  songs: (params?: { search?: string; tag?: number | null }) =>
     ['songs', params] as const,
   song: (id: number) => ['song', id] as const,
   chords: (search?: string) => ['chords', search] as const,
@@ -16,7 +16,7 @@ export const queryKeys = {
 }
 
 // Songs queries
-export function useSongs(params?: { search?: string; tag?: number | null; favorites?: boolean }) {
+export function useSongs(params?: { search?: string; tag?: number | null }) {
   const api = useApi()
 
   return useQuery({
@@ -26,7 +26,6 @@ export function useSongs(params?: { search?: string; tag?: number | null; favori
       const queryParams: string[] = []
       if (params?.search) queryParams.push(`search=${encodeURIComponent(params.search)}`)
       if (params?.tag) queryParams.push(`tag=${params.tag}`)
-      if (params?.favorites) queryParams.push('favorites=true')
       if (queryParams.length > 0) {
         url += '?' + queryParams.join('&')
       }
@@ -262,61 +261,6 @@ export function useDeleteSong() {
   return useMutation({
     mutationFn: (id: number) => api.del(`/api/songs/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['songs'] })
-    },
-  })
-}
-
-// Favorite mutations
-export function useToggleFavorite() {
-  const api = useApi()
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ songId, isFavorite }: { songId: number; isFavorite: boolean }) => {
-      if (isFavorite) {
-        return api.del(`/api/songs/${songId}/favorite`)
-      } else {
-        return api.post(`/api/songs/${songId}/favorite`, {})
-      }
-    },
-    onMutate: async ({ songId, isFavorite }) => {
-      // Update song detail
-      await queryClient.cancelQueries({ queryKey: queryKeys.song(songId) })
-      const previousSong = queryClient.getQueryData<Song>(queryKeys.song(songId))
-
-      if (previousSong) {
-        queryClient.setQueryData<Song>(queryKeys.song(songId), {
-          ...previousSong,
-          is_favorite: !isFavorite,
-        })
-      }
-
-      // Update songs list
-      const songsQueries = queryClient.getQueriesData<Song[]>({ queryKey: ['songs'] })
-      const previousSongsData: { queryKey: readonly unknown[]; data: Song[] | undefined }[] = []
-
-      songsQueries.forEach(([queryKey, data]) => {
-        previousSongsData.push({ queryKey, data })
-        if (data) {
-          queryClient.setQueryData<Song[]>(queryKey, data.map(s =>
-            s.id === songId ? { ...s, is_favorite: !isFavorite } : s
-          ))
-        }
-      })
-
-      return { previousSong, previousSongsData }
-    },
-    onError: (_, variables, context) => {
-      if (context?.previousSong) {
-        queryClient.setQueryData(queryKeys.song(variables.songId), context.previousSong)
-      }
-      context?.previousSongsData.forEach(({ queryKey, data }) => {
-        if (data) queryClient.setQueryData(queryKey, data)
-      })
-    },
-    onSettled: (_, __, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.song(variables.songId) })
       queryClient.invalidateQueries({ queryKey: ['songs'] })
     },
   })

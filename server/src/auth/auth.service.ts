@@ -1,9 +1,11 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { DatabaseService } from '../database/database.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { UpdateUsernameDto } from './dto/update-username.dto';
+import { UpdatePasswordDto } from './dto/update-password.dto';
 
 export interface User {
   id: number;
@@ -104,6 +106,72 @@ export class AuthService {
       is_admin: result.rows[0].is_admin || false,
       created_at: result.rows[0].created_at,
     };
+  }
+
+  async updateUsername(userId: number, dto: UpdateUsernameDto): Promise<{ user: User; token: string }> {
+    const { newUsername } = dto;
+
+    // Check if new username already exists (by another user)
+    const existing = await this.db.query(
+      'SELECT id FROM users WHERE username = $1 AND id != $2',
+      [newUsername, userId]
+    );
+
+    if (existing.rows.length > 0) {
+      throw new ConflictException('Username already taken');
+    }
+
+    // Update username
+    const result = await this.db.query(
+      'UPDATE users SET username = $1 WHERE id = $2 RETURNING id, username, is_admin, created_at',
+      [newUsername, userId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new BadRequestException('User not found');
+    }
+
+    const user: User = {
+      id: result.rows[0].id,
+      username: result.rows[0].username,
+      is_admin: result.rows[0].is_admin || false,
+      created_at: result.rows[0].created_at,
+    };
+
+    // Generate new token with updated username
+    const token = this.generateToken(user);
+
+    return { user, token };
+  }
+
+  async updatePassword(userId: number, dto: UpdatePasswordDto): Promise<void> {
+    const { currentPassword, newPassword } = dto;
+
+    // Get current password hash
+    const result = await this.db.query(
+      'SELECT password_hash FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new BadRequestException('User not found');
+    }
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(currentPassword, result.rows[0].password_hash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    // Hash new password
+    const saltRounds = 10;
+    const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update password
+    await this.db.query(
+      'UPDATE users SET password_hash = $1 WHERE id = $2',
+      [newPasswordHash, userId]
+    );
   }
 
   private generateToken(user: User): string {

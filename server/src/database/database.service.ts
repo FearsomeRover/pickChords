@@ -130,17 +130,6 @@ export class DatabaseService implements OnModuleInit {
         END $$;
       `);
 
-      // Create favorites table
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS favorites (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          song_id INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE(user_id, song_id)
-        )
-      `);
-
       // Create logs table
       await client.query(`
         CREATE TABLE IF NOT EXISTS logs (

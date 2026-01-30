@@ -6,11 +6,9 @@ interface SongModalProps {
   song: Song
   onClose: () => void
   onDelete: () => void
-  onFavorite?: () => void
-  isFavorite?: boolean
 }
 
-export default function SongModal({ song, onClose, onDelete, onFavorite, isFavorite }: SongModalProps) {
+export default function SongModal({ song, onClose, onDelete }: SongModalProps) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal song-modal" onClick={(e) => e.stopPropagation()}>
@@ -19,15 +17,6 @@ export default function SongModal({ song, onClose, onDelete, onFavorite, isFavor
             <h2>{song.name}</h2>
             {song.artist && <p className="song-artist">{song.artist}</p>}
           </div>
-          {onFavorite && (
-            <button
-              className={`favorite-btn large ${isFavorite ? 'active' : ''}`}
-              onClick={onFavorite}
-              title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-            >
-              {isFavorite ? '\u2605' : '\u2606'}
-            </button>
-          )}
         </div>
 
         {song.tags && song.tags.length > 0 && (
@@ -50,10 +39,7 @@ export default function SongModal({ song, onClose, onDelete, onFavorite, isFavor
             <h4>Chords</h4>
             <div className="chords-grid compact">
               {song.chords.map((chord) => (
-                <div key={chord.id} className="chord-card compact">
-                  <h3>{chord.name}</h3>
-                  <ChordDiagram chord={chord} width={120} height={150} />
-                </div>
+                <ChordDiagram key={chord.id} chord={chord} width={120} height={150} />
               ))}
             </div>
           </div>

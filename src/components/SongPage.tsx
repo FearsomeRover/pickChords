@@ -5,7 +5,6 @@ import { useAuth } from '../hooks/useAuth'
 import { useIsMobile } from '../hooks/useIsMobile'
 import {
   useSong,
-  useToggleFavorite,
   useProgressItem,
   useAddToProgress,
 } from '../hooks/useQueries'
@@ -21,8 +20,6 @@ export default function SongPage() {
   const songId = id ? parseInt(id, 10) : undefined
 
   const { data: song, isLoading, error } = useSong(songId)
-
-  const toggleFavoriteMutation = useToggleFavorite()
 
   // Progress tracking
   const { data: progressItem } = useProgressItem(songId)
@@ -44,14 +41,6 @@ export default function SongPage() {
   }, [showProgressMenu])
 
   const chords = song?.chords || []
-
-  const handleToggleFavorite = () => {
-    if (!song || !user) return
-    toggleFavoriteMutation.mutate({
-      songId: song.id,
-      isFavorite: !!song.is_favorite,
-    })
-  }
 
   const handleAddToProgress = (status: ProgressStatus) => {
     if (!song || !user) return
@@ -102,17 +91,6 @@ export default function SongPage() {
           {song.artist && <p className="text-deep-navy/70 text-lg">{song.artist}</p>}
         </div>
         <div className="flex gap-2 items-center">
-          {user && (
-            <button
-              className={`bg-transparent border-0 text-3xl cursor-pointer p-1 transition-all duration-200 hover:scale-110 ${
-                song.is_favorite ? 'text-mustard-yellow' : 'text-light-gray'
-              }`}
-              onClick={handleToggleFavorite}
-              title={song.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
-            >
-              {song.is_favorite ? '\u2605' : '\u2606'}
-            </button>
-          )}
           {/* Add to Progress and Edit buttons hidden on mobile */}
           {!isMobile && user && !progressItem && (
             <div className="relative">
@@ -177,20 +155,14 @@ export default function SongPage() {
         </div>
       )}
 
-      <div className="bg-off-white rounded-xl p-6 border-2 border-[#D4C9BC]">
+      <div className={`bg-off-white rounded-xl border-2 border-[#D4C9BC] ${isMobile ? 'p-4' : 'p-6'}`}>
         <h4 className="text-lg font-semibold text-deep-navy mb-5">Chords</h4>
 
         {chords.length > 0 ? (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
+          <div className={`grid gap-4 ${isMobile ? 'grid-cols-2' : 'grid-cols-[repeat(auto-fill,minmax(200px,1fr))]'}`}>
             {chords.map((chord, index) => (
-              <div
-                key={`${chord.id}-${index}`}
-                className="bg-cream rounded-lg p-4 text-center border-2 border-[#D4C9BC]"
-              >
-                <h3 className="text-xl font-semibold text-teal-green mb-3">{chord.name}</h3>
-                <div className="flex justify-center">
-                  <ChordDiagram chord={chord} width={180} height={220} />
-                </div>
+              <div key={`${chord.id}-${index}`} className="flex justify-center">
+                <ChordDiagram chord={chord} width={isMobile ? 110 : 180} height={isMobile ? 140 : 220} />
               </div>
             ))}
           </div>

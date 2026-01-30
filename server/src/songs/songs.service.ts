@@ -26,7 +26,6 @@ export interface Song {
 export interface SongWithExpanded extends Song {
   chords?: any[];
   tags?: any[];
-  is_favorite?: boolean;
 }
 
 @Injectable()
@@ -40,17 +39,10 @@ export class SongsService {
   async findAll(options: {
     search?: string;
     tagId?: number;
-    favorites?: boolean;
-    userId?: number;
   }): Promise<SongWithExpanded[]> {
     let query = 'SELECT s.* FROM songs s';
     const params: any[] = [];
     const conditions: string[] = [];
-
-    if (options.favorites && options.userId) {
-      query += ' INNER JOIN favorites f ON s.id = f.song_id AND f.user_id = $1';
-      params.push(options.userId);
-    }
 
     if (options.search) {
       params.push(`%${options.search.toLowerCase()}%`);
@@ -75,20 +67,12 @@ export class SongsService {
     for (const song of songs) {
       song.chords = await this.chordsService.findByIds(song.chord_ids || []);
       song.tags = await this.tagsService.findByIds(song.tag_ids || []);
-
-      if (options.userId) {
-        const favResult = await this.db.query(
-          'SELECT 1 FROM favorites WHERE user_id = $1 AND song_id = $2',
-          [options.userId, song.id]
-        );
-        song.is_favorite = favResult.rows.length > 0;
-      }
     }
 
     return songs;
   }
 
-  async findOne(id: number, userId?: number): Promise<SongWithExpanded> {
+  async findOne(id: number): Promise<SongWithExpanded> {
     const result = await this.db.query('SELECT * FROM songs WHERE id = $1', [id]);
 
     if (result.rows.length === 0) {
@@ -100,14 +84,6 @@ export class SongsService {
     // Expand chords and tags
     song.chords = await this.chordsService.findByIds(song.chord_ids || []);
     song.tags = await this.tagsService.findByIds(song.tag_ids || []);
-
-    if (userId) {
-      const favResult = await this.db.query(
-        'SELECT 1 FROM favorites WHERE user_id = $1 AND song_id = $2',
-        [userId, id]
-      );
-      song.is_favorite = favResult.rows.length > 0;
-    }
 
     return song;
   }

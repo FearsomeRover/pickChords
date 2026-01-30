@@ -15,7 +15,7 @@ import {
 } from '@nestjs/common';
 import { SongsService } from './songs.service';
 import { CreateSongDto } from './dto/create-song.dto';
-import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/auth.guard';
+import { JwtAuthGuard } from '../auth/auth.guard';
 import { LogsService } from '../logs/logs.service';
 
 @Controller('songs')
@@ -26,25 +26,19 @@ export class SongsController {
   ) {}
 
   @Get()
-  @UseGuards(OptionalJwtAuthGuard)
   findAll(
-    @Request() req: any,
     @Query('search') search?: string,
     @Query('tag') tagId?: string,
-    @Query('favorites') favorites?: string,
   ) {
     return this.songsService.findAll({
       search,
       tagId: tagId ? parseInt(tagId, 10) : undefined,
-      favorites: favorites === 'true',
-      userId: req.user?.id,
     });
   }
 
   @Get(':id')
-  @UseGuards(OptionalJwtAuthGuard)
-  findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
-    return this.songsService.findOne(id, req.user?.id);
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.songsService.findOne(id);
   }
 
   @Post()

@@ -56,36 +56,18 @@ function SortableChord({ chord, index, onRemove }: SortableChordProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className="bg-cream rounded-lg p-4 text-center border-2 border-[#D4C9BC] transition-all duration-200 relative cursor-move hover:border-teal-green"
+      className="transition-all duration-200 cursor-move"
       {...attributes}
       {...listeners}
     >
-      <button
-        className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center bg-off-white text-[#D64545] rounded-lg border-2 border-[#D4C9BC] transition-all duration-200 hover:border-[#D64545] cursor-pointer text-lg"
-        onClick={(e) => {
-          e.stopPropagation()
-          onRemove()
-        }}
-        onPointerDown={(e) => e.stopPropagation()}
-      >
-        &times;
-      </button>
-      <h3 className="text-xl font-semibold text-teal-green mb-3">{chord.name}</h3>
-      <div className="flex justify-center pointer-events-none">
-        <ChordDiagram chord={chord} width={150} height={180} />
-      </div>
+      <ChordDiagram chord={chord} width={150} height={180} onRemove={onRemove} />
     </div>
   )
 }
 
 function ChordCard({ chord }: { chord: Chord }) {
   return (
-    <div className="bg-cream rounded-lg p-4 text-center border-2 border-teal-green shadow-lg">
-      <h3 className="text-xl font-semibold text-teal-green mb-3">{chord.name}</h3>
-      <div className="flex justify-center">
-        <ChordDiagram chord={chord} width={150} height={180} />
-      </div>
-    </div>
+    <ChordDiagram chord={chord} width={150} height={180} />
   )
 }
 

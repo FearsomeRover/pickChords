@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { Chord, StringData } from '../types'
 import { useAuth } from '../hooks/useAuth'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { useChords, useCreateChord, useUpdateChord, useDeleteChord } from '../hooks/useQueries'
 import ChordDiagram from '../components/ChordDiagram'
+import ExpandableSearch from '../components/ExpandableSearch'
 
 function ChordsPage() {
   const { user } = useAuth()
@@ -20,7 +22,6 @@ function ChordsPage() {
 
   // Modals
   const [showChordModal, setShowChordModal] = useState(false)
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null)
 
   // Chord form (for add/edit)
   const [editingChordId, setEditingChordId] = useState<number | null>(null)
@@ -35,17 +36,6 @@ function ChordsPage() {
   })
 
   const isAdmin = user?.is_admin === true
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = () => {
-      if (openMenuId !== null) {
-        setOpenMenuId(null)
-      }
-    }
-    document.addEventListener('click', handleClickOutside)
-    return () => document.removeEventListener('click', handleClickOutside)
-  }, [openMenuId])
 
   const parseStringInput = (value: string): StringData => {
     const trimmed = value.trim().toLowerCase()
@@ -92,7 +82,6 @@ function ChordsPage() {
       rawInputs: chord.strings.map(getStringDisplayValue),
     })
     setShowChordModal(true)
-    setOpenMenuId(null)
   }
 
   const closeChordModal = () => {
@@ -131,7 +120,6 @@ function ChordsPage() {
     deleteChordMutation.mutate(id, {
       onError: (err) => alert('Failed to delete chord: ' + (err instanceof Error ? err.message : 'Unknown error')),
     })
-    setOpenMenuId(null)
   }
 
   const handleSearchChange = (value: string) => {
@@ -150,12 +138,10 @@ function ChordsPage() {
   return (
     <>
       <div className="mb-5">
-        <input
-          type="text"
-          className="w-full max-w-md px-4 py-3 text-base border-2 border-[#D4C9BC] rounded-lg bg-off-white text-deep-navy outline-none transition-all duration-200 focus:border-deep-navy focus:shadow-[0_0_0_3px_rgba(0,22,45,0.1)] placeholder:text-light-gray"
-          placeholder="Search chords..."
+        <ExpandableSearch
           value={searchTerm}
-          onChange={(e) => handleSearchChange(e.target.value)}
+          onChange={handleSearchChange}
+          placeholder="Search chords..."
         />
       </div>
 
@@ -170,43 +156,18 @@ function ChordsPage() {
           No chords found. {isAdmin && 'Add some chords to get started!'}
         </div>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-6">
+        <div className={`grid ${isMobile ? 'grid-cols-2 gap-4' : 'grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-6'}`}>
           {chords.map((chord) => (
-            <div key={chord.id} className="bg-off-white rounded-xl p-5 text-center transition-all duration-200 border-2 border-[#D4C9BC] hover:-translate-y-1 hover:shadow-[0_8px_24px_rgba(0,22,45,0.1)] hover:border-deep-navy relative">
-              {/* 3-dot menu for admins (hidden on mobile) */}
-              {isAdmin && !isMobile && (
-                <div className="absolute top-3 right-3">
-                  <button
-                    className="w-8 h-8 flex items-center justify-center bg-off-white text-deep-navy rounded-lg border-2 border-[#D4C9BC] transition-all duration-200 hover:border-deep-navy cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setOpenMenuId(openMenuId === chord.id ? null : chord.id)
-                    }}
-                  >
-                    &#x22EE;
-                  </button>
-                  {openMenuId === chord.id && (
-                    <div className="absolute right-0 top-10 bg-off-white rounded-lg shadow-lg border-2 border-[#D4C9BC] z-10 min-w-[120px]">
-                      <button
-                        className="w-full px-4 py-2 text-left text-sm text-deep-navy hover:bg-cream transition-all duration-200 border-0 cursor-pointer"
-                        onClick={() => openEditChordModal(chord)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="w-full px-4 py-2 text-left text-sm text-[#D64545] hover:bg-cream transition-all duration-200 border-0 cursor-pointer"
-                        onClick={() => handleDeleteChord(chord.id)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-              <h3 className="mb-4 text-2xl text-teal-green">{chord.name}</h3>
-              <div className="flex justify-center">
-                <ChordDiagram chord={chord} width={180} height={220} />
-              </div>
+            <div key={chord.id} className="flex justify-center">
+              <ChordDiagram
+                chord={chord}
+                width={isMobile ? 120 : 180}
+                height={isMobile ? 150 : 220}
+                menuItems={isAdmin && !isMobile ? [
+                  { label: 'Edit', onClick: () => openEditChordModal(chord), icon: <Pencil size={14} /> },
+                  { label: 'Delete', onClick: () => handleDeleteChord(chord.id), danger: true, icon: <Trash2 size={14} /> },
+                ] : undefined}
+              />
             </div>
           ))}
         </div>
@@ -215,10 +176,11 @@ function ChordsPage() {
       {/* Only show add button for admins (hidden on mobile) */}
       {isAdmin && !isMobile && (
         <button
-          className="fixed bottom-[30px] right-[30px] w-[60px] h-[60px] rounded-full border-0 bg-deep-navy text-off-white text-3xl cursor-pointer shadow-[0_4px_12px_rgba(0,22,45,0.4)] transition-all duration-200 hover:scale-110 hover:bg-[#001a3d]"
+          className="fixed bottom-[30px] right-[30px] w-[60px] h-[60px] rounded-full border-0 bg-deep-navy text-off-white cursor-pointer shadow-[0_4px_12px_rgba(0,22,45,0.4)] transition-all duration-200 hover:scale-110 hover:bg-[#001a3d] flex items-center justify-center"
           onClick={openAddChordModal}
+          title="Add new chord"
         >
-          +
+          <Plus size={28} />
         </button>
       )}
 

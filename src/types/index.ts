@@ -36,7 +36,6 @@ export interface Song {
   tag_ids: number[];
   chords?: Chord[];
   tags?: Tag[];
-  is_favorite?: boolean;
   strumming_pattern?: StrummingPattern;
   user_id?: number;
   created_at: string;
@@ -55,6 +54,7 @@ export interface AuthState {
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, password: string) => Promise<void>;
   logout: () => void;
+  updateAuth: (user: User, token: string) => void;
 }
 
 export type LogLevel = 'info' | 'warn' | 'error';
