@@ -6,6 +6,7 @@ import { useSongs, useTags } from '../hooks/useQueries'
 import SongCard from '../components/SongCard'
 import TagChip from '../components/TagChip'
 import ExpandableSearch from '../components/ExpandableSearch'
+import { ErrorCard, LoadingSpinner } from '../components/ui'
 
 function SongsPage() {
   const isMobile = useIsMobile()
@@ -53,11 +54,55 @@ function SongsPage() {
   }
 
   if (isLoading && songs.length === 0) {
-    return <div className="text-center py-10 text-light-gray">Loading...</div>
+    return <LoadingSpinner />
   }
+
+  const selectedTag = tags.find(t => t.id === selectedTagId)
 
   return (
     <>
+      {/* Tag Filter Bar */}
+      {tags.length > 0 && (
+        <div className="bg-cream rounded-xl p-4 mb-5 border-2 border-[#D4C9BC]">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-deep-navy font-semibold text-sm">Filter:</span>
+            <button
+              className={`px-3 py-1.5 text-sm rounded-full font-medium transition-all duration-200 border-2 ${
+                selectedTagId === null
+                  ? 'bg-deep-navy text-off-white border-deep-navy shadow-sm'
+                  : 'bg-off-white text-deep-navy border-[#D4C9BC] hover:border-deep-navy'
+              }`}
+              onClick={() => handleTagSelect(null)}
+            >
+              All Songs
+            </button>
+            {tags.map((tag) => (
+              <TagChip
+                key={tag.id}
+                tag={tag}
+                selected={selectedTagId === tag.id}
+                onClick={() => handleTagSelect(selectedTagId === tag.id ? null : tag.id)}
+              />
+            ))}
+          </div>
+          {selectedTag && (
+            <div className="mt-3 flex items-center gap-2 text-sm">
+              <span className="text-light-gray">
+                Showing songs tagged with
+              </span>
+              <TagChip tag={selectedTag} selected />
+              <button
+                className="text-light-gray hover:text-deep-navy underline ml-1"
+                onClick={() => handleTagSelect(null)}
+              >
+                Clear filter
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Search Bar */}
       <div className="mb-5">
         <ExpandableSearch
           value={searchTerm}
@@ -66,34 +111,10 @@ function SongsPage() {
         />
       </div>
 
-      {tags.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 mb-5">
-          <span className="text-deep-navy font-medium mr-1">Filter by tag:</span>
-          <button
-            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-all duration-200 border-2 ${
-              selectedTagId === null
-                ? 'bg-deep-navy text-off-white border-deep-navy'
-                : 'bg-off-white text-deep-navy border-[#D4C9BC] hover:border-deep-navy'
-            }`}
-            onClick={() => handleTagSelect(null)}
-          >
-            All
-          </button>
-          {tags.map((tag) => (
-            <TagChip
-              key={tag.id}
-              tag={tag}
-              selected={selectedTagId === tag.id}
-              onClick={() => handleTagSelect(selectedTagId === tag.id ? null : tag.id)}
-            />
-          ))}
-        </div>
-      )}
-
       {error && (
-        <div className="text-[#D64545] bg-[rgba(214,69,69,0.1)] border-2 border-[#D64545] rounded-lg text-center p-5">
-          Error: {error instanceof Error ? error.message : 'Failed to load songs'}
-        </div>
+        <ErrorCard
+          message={error instanceof Error ? error.message : 'Failed to load songs'}
+        />
       )}
 
       {songs.length === 0 ? (

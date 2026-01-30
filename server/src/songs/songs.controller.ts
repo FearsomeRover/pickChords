@@ -11,6 +11,7 @@ import {
   UseGuards,
   Request,
   ForbiddenException,
+  NotFoundException,
   Headers,
 } from '@nestjs/common';
 import { SongsService } from './songs.service';
@@ -70,7 +71,7 @@ export class SongsController {
     // Check ownership or admin
     const song = await this.songsService.findOneRaw(id);
     if (!song) {
-      throw new ForbiddenException('Song not found');
+      throw new NotFoundException('Song not found');
     }
 
     const isOwner = song.user_id === req.user.id;
@@ -108,7 +109,7 @@ export class SongsController {
     // Check ownership or admin
     const song = await this.songsService.findOneRaw(id);
     if (!song) {
-      throw new ForbiddenException('Song not found');
+      throw new NotFoundException('Song not found');
     }
 
     const isOwner = song.user_id === req.user.id;

@@ -22,22 +22,17 @@ import { CSS } from '@dnd-kit/utilities'
 import { useAuth } from '../hooks/useAuth'
 import { useProgress, useUpdateProgress, useRemoveFromProgress } from '../hooks/useQueries'
 import { SongProgress, ProgressStatus } from '../types'
+import { PROGRESS_PROGRESS_COLUMNS } from '../constants/progress'
+import { Button, ErrorCard, LoadingSpinner } from '../components/ui'
 
-const COLUMNS: { id: ProgressStatus; title: string; color: string }[] = [
-  { id: 'want_to_learn', title: 'Want to Learn', color: 'bg-[#6366F1]' },
-  { id: 'learning', title: 'Learning', color: 'bg-[#F59E0B]' },
-  { id: 'practicing', title: 'Practicing', color: 'bg-[#10B981]' },
-  { id: 'mastered', title: 'Mastered', color: 'bg-teal-green' },
-]
-
-interface SongCardProps {
+interface ProgressCardProps {
   item: SongProgress
   isDragging?: boolean
   onRemove?: () => void
   onClick?: () => void
 }
 
-function SongCard({ item, isDragging, onRemove, onClick }: SongCardProps) {
+function ProgressCard({ item, isDragging, onRemove, onClick }: ProgressCardProps) {
   return (
     <div
       className={`bg-off-white rounded-lg p-3 border-2 border-[#D4C9BC] cursor-grab transition-all duration-200 ${
@@ -92,7 +87,7 @@ function SortableCard({ item, onRemove, onClick }: { item: SongProgress; onRemov
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <SongCard item={item} onRemove={onRemove} onClick={onClick} />
+      <ProgressCard item={item} onRemove={onRemove} onClick={onClick} />
     </div>
   )
 }
@@ -103,7 +98,7 @@ function Column({
   onRemove,
   onCardClick,
 }: {
-  column: typeof COLUMNS[number]
+  column: typeof PROGRESS_PROGRESS_COLUMNS[number]
   items: SongProgress[]
   onRemove: (songId: number) => void
   onCardClick: (songId: number) => void
@@ -210,12 +205,7 @@ function ProgressPage() {
       <div className="text-center py-10">
         <h2 className="text-2xl text-deep-navy mb-4">Login Required</h2>
         <p className="text-light-gray mb-4">Please log in to track your progress.</p>
-        <button
-          className="px-5 py-2.5 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer"
-          onClick={() => navigate('/')}
-        >
-          Go Home
-        </button>
+        <Button onClick={() => navigate('/')}>Go Home</Button>
       </div>
     )
   }
@@ -256,7 +246,7 @@ function ProgressPage() {
       }
     } else {
       // Dropped on a column (empty area)
-      const columnStatus = COLUMNS.find(c => c.id === overId)?.id
+      const columnStatus = PROGRESS_COLUMNS.find(c => c.id === overId)?.id
       if (columnStatus) {
         newStatus = columnStatus
         // Position at the end of the column
@@ -285,14 +275,14 @@ function ProgressPage() {
   }
 
   if (isLoading) {
-    return <div className="text-center py-10 text-light-gray">Loading...</div>
+    return <LoadingSpinner />
   }
 
   if (error) {
     return (
-      <div className="text-[#D64545] bg-[rgba(214,69,69,0.1)] border-2 border-[#D64545] rounded-lg text-center p-5">
-        Error: {error instanceof Error ? error.message : 'Failed to load progress'}
-      </div>
+      <ErrorCard
+        message={error instanceof Error ? error.message : 'Failed to load progress'}
+      />
     )
   }
 
@@ -311,12 +301,7 @@ function ProgressPage() {
           <p className="text-light-gray mb-6">
             Add songs to your progress board from the song details page.
           </p>
-          <button
-            className="px-5 py-2.5 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer"
-            onClick={() => navigate('/songs')}
-          >
-            Browse Songs
-          </button>
+          <Button onClick={() => navigate('/songs')}>Browse Songs</Button>
         </div>
       ) : (
         <DndContext
@@ -327,7 +312,7 @@ function ProgressPage() {
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-4 overflow-x-auto pb-4">
-            {COLUMNS.map((column) => (
+            {PROGRESS_COLUMNS.map((column) => (
               <Column
                 key={column.id}
                 column={column}
@@ -339,7 +324,7 @@ function ProgressPage() {
           </div>
 
           <DragOverlay dropAnimation={null}>
-            {activeItem && <SongCard item={activeItem} isDragging />}
+            {activeItem && <ProgressCard item={activeItem} isDragging />}
           </DragOverlay>
         </DndContext>
       )}

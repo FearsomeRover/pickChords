@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { StrokeType, StrummingPattern } from '../types'
+import StrokeDisplay, { getSubdivision, getBeatsPerBar } from './strumming/StrokeDisplay'
+import { Button } from './ui'
 
 interface StrummingPatternEditorProps {
   pattern?: StrummingPattern
@@ -10,66 +12,6 @@ interface StrummingPatternEditorProps {
 }
 
 const NOTE_LENGTHS = ['1/4', '1/8', '1/8 triplet', '1/16', '1/16 triplet'] as const
-
-// Get beats per bar based on note length
-function getBeatsPerBar(noteLength: string): number {
-  switch (noteLength) {
-    case '1/4': return 4
-    case '1/8': return 8
-    case '1/8 triplet': return 12
-    case '1/16': return 16
-    case '1/16 triplet': return 24
-    default: return 8
-  }
-}
-
-// Get subdivision grouping
-function getSubdivision(noteLength: string): number {
-  switch (noteLength) {
-    case '1/4': return 1
-    case '1/8': return 2
-    case '1/8 triplet': return 3
-    case '1/16': return 4
-    case '1/16 triplet': return 6
-    default: return 2
-  }
-}
-
-// Stroke display
-function StrokeDisplay({ stroke, isSelected }: { stroke: StrokeType; isSelected?: boolean }) {
-  const baseClasses = `text-2xl font-bold transition-all duration-150 ${isSelected ? 'text-coral scale-110' : 'text-deep-navy'}`
-  const accentClasses = `text-xs font-bold ${isSelected ? 'text-coral' : 'text-deep-navy'}`
-
-  switch (stroke) {
-    case 'down':
-      return <span className={baseClasses}>&#8595;</span>
-    case 'up':
-      return <span className={baseClasses}>&#8593;</span>
-    case 'mute_down':
-      return <span className={`${baseClasses} opacity-60`}>&#8595;</span>
-    case 'mute_up':
-      return <span className={`${baseClasses} opacity-60`}>&#8593;</span>
-    case 'accent_down':
-      return (
-        <span className="flex flex-col items-center">
-          <span className={accentClasses}>&gt;</span>
-          <span className={baseClasses}>&#8595;</span>
-        </span>
-      )
-    case 'accent_up':
-      return (
-        <span className="flex flex-col items-center">
-          <span className={accentClasses}>&gt;</span>
-          <span className={baseClasses}>&#8593;</span>
-        </span>
-      )
-    case 'rest':
-      return <span className={`${baseClasses} text-light-gray`}>R</span>
-    case 'skip':
-    default:
-      return <span className={`${baseClasses} text-light-gray`}>&middot;</span>
-  }
-}
 
 export default function StrummingPatternEditor({
   pattern,
@@ -289,7 +231,7 @@ export default function StrummingPatternEditor({
             className="px-3 py-1 text-sm rounded-lg border-2 border-[#D4C9BC] bg-cream text-deep-navy cursor-pointer"
             onChange={(e) => {
               if (e.target.value) {
-                loadPreset(e.target.value as any)
+                loadPreset(e.target.value as 'basic_down' | 'down_up' | 'folk' | 'rock')
                 e.target.value = ''
               }
             }}
@@ -315,7 +257,7 @@ export default function StrummingPatternEditor({
               }`}
               onClick={() => handleStrokeClick(index)}
             >
-              <StrokeDisplay stroke={stroke} isSelected={isEditing && selectedIndex === index} />
+              <StrokeDisplay stroke={stroke} isSelected={isEditing && selectedIndex === index} size="lg" />
             </div>
           ))}
         </div>
@@ -396,28 +338,27 @@ export default function StrummingPatternEditor({
 
         <div className="flex gap-2 ml-auto">
           {onPlay && (
-            <button
-              className="px-4 py-2 text-sm rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer"
-              onClick={onPlay}
-            >
+            <Button onClick={onPlay} className="px-4 py-2 text-sm">
               Play
-            </button>
+            </Button>
           )}
           {!readOnly && (
-            <button
-              className="px-4 py-2 text-sm rounded-lg font-medium bg-off-white text-deep-navy border-2 border-[#D4C9BC] transition-all duration-200 hover:border-deep-navy cursor-pointer"
+            <Button
+              variant="secondary"
               onClick={() => setIsEditing(!isEditing)}
+              className="px-4 py-2 text-sm"
             >
               {isEditing ? 'Done' : 'Edit'}
-            </button>
+            </Button>
           )}
           {onDelete && (
-            <button
-              className="px-4 py-2 text-sm rounded-lg font-medium bg-off-white text-[#D64545] border-2 border-[#D4C9BC] transition-all duration-200 hover:border-[#D64545] cursor-pointer"
+            <Button
+              variant="danger"
               onClick={onDelete}
+              className="px-4 py-2 text-sm"
             >
               Delete
-            </button>
+            </Button>
           )}
         </div>
       </div>

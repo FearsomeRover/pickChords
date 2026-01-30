@@ -7,6 +7,7 @@ import { useIsMobile } from '../hooks/useIsMobile'
 import { useChords, useCreateChord, useUpdateChord, useDeleteChord } from '../hooks/useQueries'
 import ChordDiagram from '../components/ChordDiagram'
 import ExpandableSearch from '../components/ExpandableSearch'
+import { Modal, ModalFooter, FormInput, Button, ErrorCard, LoadingSpinner } from '../components/ui'
 
 function ChordsPage() {
   const { user } = useAuth()
@@ -132,7 +133,7 @@ function ChordsPage() {
   }
 
   if (isLoading && chords.length === 0) {
-    return <div className="text-center py-10 text-light-gray">Loading...</div>
+    return <LoadingSpinner />
   }
 
   return (
@@ -146,9 +147,9 @@ function ChordsPage() {
       </div>
 
       {error && (
-        <div className="text-[#D64545] bg-[rgba(214,69,69,0.1)] border-2 border-[#D64545] rounded-lg text-center p-5">
-          Error: {error instanceof Error ? error.message : 'Failed to load chords'}
-        </div>
+        <ErrorCard
+          message={error instanceof Error ? error.message : 'Failed to load chords'}
+        />
       )}
 
       {chords.length === 0 ? (
@@ -184,71 +185,60 @@ function ChordsPage() {
         </button>
       )}
 
-      {!isMobile && showChordModal && (
-        <div className="fixed inset-0 bg-[rgba(15,27,46,0.7)] backdrop-blur-sm flex items-center justify-center z-[1000]" onClick={closeChordModal}>
-          <div className="bg-off-white rounded-2xl p-8 max-w-[500px] w-[90%] max-h-[90vh] overflow-y-auto border-2 border-[#D4C9BC] shadow-[0_12px_48px_rgba(15,27,46,0.2)]" onClick={(e) => e.stopPropagation()}>
-            <h2 className="mb-5 text-deep-navy">{editingChordId ? 'Edit Chord' : 'Add New Chord'}</h2>
+      {!isMobile && (
+        <Modal
+          isOpen={showChordModal}
+          onClose={closeChordModal}
+          title={editingChordId ? 'Edit Chord' : 'Add New Chord'}
+          size="md"
+        >
+          <FormInput
+            label="Chord Name"
+            placeholder="e.g., Am7, Gmaj7, F#m"
+            value={chordForm.name}
+            onChange={(e) => setChordForm({ ...chordForm, name: e.target.value })}
+          />
 
-            <div className="mb-5">
-              <label className="block mb-2 font-medium text-deep-navy">Chord Name</label>
-              <input
-                type="text"
-                placeholder="e.g., Am7, Gmaj7, F#m"
-                value={chordForm.name}
-                onChange={(e) => setChordForm({ ...chordForm, name: e.target.value })}
-                className="w-full px-3.5 py-2.5 text-base border-2 border-[#D4C9BC] rounded-lg bg-off-white text-deep-navy outline-none focus:border-deep-navy focus:shadow-[0_0_0_3px_rgba(0,22,45,0.1)] placeholder:text-light-gray"
-              />
+          <div className="mb-5">
+            <label className="block mb-2 font-medium text-deep-navy">String Positions (low E to high E)</label>
+            <div className="grid grid-cols-6 gap-2.5">
+              {['E', 'A', 'D', 'G', 'B', 'e'].map((stringName, i) => (
+                <div key={i} className="flex flex-col items-center">
+                  <label className="text-[0.85rem] text-light-gray mb-1">{stringName}</label>
+                  <input
+                    type="text"
+                    placeholder="0"
+                    value={chordForm.rawInputs[i]}
+                    onChange={(e) => handleStringChange(i, e.target.value)}
+                    className="w-[50px] text-center px-2 py-2 text-base border-2 border-[#D4C9BC] rounded-lg bg-off-white text-deep-navy outline-none focus:border-deep-navy focus:shadow-[0_0_0_3px_rgba(0,22,45,0.1)]"
+                  />
+                </div>
+              ))}
             </div>
+            <p className="text-[0.85rem] text-light-gray mt-2">
+              Use: x = muted, 0 = open, or fret-finger (e.g., "2-1" for fret 2, finger 1)
+            </p>
+          </div>
 
-            <div className="mb-5">
-              <label className="block mb-2 font-medium text-deep-navy">String Positions (low E to high E)</label>
-              <div className="grid grid-cols-6 gap-2.5">
-                {['E', 'A', 'D', 'G', 'B', 'e'].map((stringName, i) => (
-                  <div key={i} className="flex flex-col items-center">
-                    <label className="text-[0.85rem] text-light-gray mb-1">{stringName}</label>
-                    <input
-                      type="text"
-                      placeholder="0"
-                      value={chordForm.rawInputs[i]}
-                      onChange={(e) => handleStringChange(i, e.target.value)}
-                      className="w-[50px] text-center px-2 py-2 text-base border-2 border-[#D4C9BC] rounded-lg bg-off-white text-deep-navy outline-none focus:border-deep-navy focus:shadow-[0_0_0_3px_rgba(0,22,45,0.1)]"
-                    />
-                  </div>
-                ))}
-              </div>
-              <p className="text-[0.85rem] text-light-gray mt-2">
-                Use: x = muted, 0 = open, or fret-finger (e.g., "2-1" for fret 2, finger 1)
-              </p>
-            </div>
-
-            <div className="mt-5 mb-5">
-              <p className="text-[0.85rem] text-light-gray mb-2.5 mt-0">Preview:</p>
-              <div className="flex justify-center">
-                <ChordDiagram chord={chordForm} />
-              </div>
-            </div>
-
-            <div className="flex gap-3 justify-end mt-6">
-              <button
-                className="px-5 py-2.5 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer"
-                onClick={closeChordModal}
-              >
-                Cancel
-              </button>
-              <button
-                className="px-5 py-2.5 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] hover:shadow-[0_4px_12px_rgba(0,22,45,0.3)] border-0 cursor-pointer"
-                onClick={handleSaveChord}
-                disabled={createChordMutation.isPending || updateChordMutation.isPending}
-              >
-                {createChordMutation.isPending || updateChordMutation.isPending
-                  ? 'Saving...'
-                  : editingChordId
-                  ? 'Save'
-                  : 'Add Chord'}
-              </button>
+          <div className="mt-5 mb-5">
+            <p className="text-[0.85rem] text-light-gray mb-2.5 mt-0">Preview:</p>
+            <div className="flex justify-center">
+              <ChordDiagram chord={chordForm} />
             </div>
           </div>
-        </div>
+
+          <ModalFooter>
+            <Button variant="secondary" onClick={closeChordModal}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveChord}
+              loading={createChordMutation.isPending || updateChordMutation.isPending}
+            >
+              {editingChordId ? 'Save' : 'Add Chord'}
+            </Button>
+          </ModalFooter>
+        </Modal>
       )}
     </>
   )

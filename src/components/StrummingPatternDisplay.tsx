@@ -1,56 +1,10 @@
-import { StrokeType, StrummingPattern } from '../types'
+import { StrummingPattern } from '../types'
+import StrokeDisplay, { getSubdivision } from './strumming/StrokeDisplay'
+import { Button } from './ui'
 
 interface StrummingPatternDisplayProps {
   pattern: StrummingPattern
   onEdit?: () => void
-}
-
-// Get subdivision grouping
-function getSubdivision(noteLength: string): number {
-  switch (noteLength) {
-    case '1/4': return 1
-    case '1/8': return 2
-    case '1/8 triplet': return 3
-    case '1/16': return 4
-    case '1/16 triplet': return 6
-    default: return 2
-  }
-}
-
-// Stroke display
-function StrokeDisplay({ stroke }: { stroke: StrokeType }) {
-  const baseClasses = 'text-xl font-bold text-deep-navy'
-  const accentClasses = 'text-xs font-bold text-deep-navy'
-
-  switch (stroke) {
-    case 'down':
-      return <span className={baseClasses}>&#8595;</span>
-    case 'up':
-      return <span className={baseClasses}>&#8593;</span>
-    case 'mute_down':
-      return <span className={`${baseClasses} opacity-60`}>&#8595;</span>
-    case 'mute_up':
-      return <span className={`${baseClasses} opacity-60`}>&#8593;</span>
-    case 'accent_down':
-      return (
-        <span className="flex flex-col items-center">
-          <span className={accentClasses}>&gt;</span>
-          <span className={baseClasses}>&#8595;</span>
-        </span>
-      )
-    case 'accent_up':
-      return (
-        <span className="flex flex-col items-center">
-          <span className={accentClasses}>&gt;</span>
-          <span className={baseClasses}>&#8593;</span>
-        </span>
-      )
-    case 'rest':
-      return <span className={`${baseClasses} text-light-gray`}>R</span>
-    case 'skip':
-    default:
-      return <span className={`${baseClasses} text-light-gray`}>&middot;</span>
-  }
 }
 
 export default function StrummingPatternDisplay({
@@ -69,12 +23,9 @@ export default function StrummingPatternDisplay({
           )}
         </h4>
         {onEdit && (
-          <button
-            className="px-3 py-1 text-sm rounded-lg font-medium bg-off-white text-deep-navy border-2 border-[#D4C9BC] transition-all duration-200 hover:border-deep-navy cursor-pointer"
-            onClick={onEdit}
-          >
+          <Button variant="secondary" onClick={onEdit} className="px-3 py-1 text-sm">
             Edit
-          </button>
+          </Button>
         )}
       </div>
 
@@ -83,7 +34,7 @@ export default function StrummingPatternDisplay({
         <div className="flex items-end gap-0 min-w-fit">
           {pattern.strokes.map((stroke, index) => (
             <div key={index} className="flex flex-col items-center min-w-[28px]">
-              <StrokeDisplay stroke={stroke} />
+              <StrokeDisplay stroke={stroke} size="md" />
             </div>
           ))}
         </div>

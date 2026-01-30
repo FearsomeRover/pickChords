@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, NotFoundException } from '@nestjs/common';
 import { Pool, PoolClient } from 'pg';
 
 @Injectable()
@@ -21,6 +21,28 @@ export class DatabaseService implements OnModuleInit {
 
   async getClient(): Promise<PoolClient> {
     return this.pool.connect();
+  }
+
+  async findById<T>(table: string, id: number): Promise<T | null> {
+    const result = await this.query(`SELECT * FROM ${table} WHERE id = $1`, [id]);
+    return result.rows[0] || null;
+  }
+
+  async findByIdOrThrow<T>(table: string, id: number, entityName?: string): Promise<T> {
+    const result = await this.findById<T>(table, id);
+    if (!result) {
+      throw new NotFoundException(`${entityName || table} not found`);
+    }
+    return result;
+  }
+
+  async findByIds<T>(table: string, ids: number[]): Promise<T[]> {
+    if (ids.length === 0) return [];
+    const result = await this.query(
+      `SELECT * FROM ${table} WHERE id = ANY($1::int[])`,
+      [ids]
+    );
+    return result.rows;
   }
 
   private async initDb() {
@@ -178,6 +200,19 @@ export class DatabaseService implements OnModuleInit {
 
       await client.query(`
         CREATE INDEX IF NOT EXISTS idx_song_progress_status ON song_progress(status)
+      `);
+
+      // Additional indexes for performance
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_songs_user_id ON songs(user_id)
+      `);
+
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_songs_created_at ON songs(created_at DESC)
+      `);
+
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_song_progress_song_id ON song_progress(song_id)
       `);
 
       // Check if we have any chords, if not insert defaults

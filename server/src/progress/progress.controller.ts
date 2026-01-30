@@ -9,17 +9,16 @@ import {
   ParseIntPipe,
   UseGuards,
   Request,
-  Headers,
 } from '@nestjs/common';
-import { ProgressService, ProgressStatus } from './progress.service';
+import { ProgressService } from './progress.service';
 import { JwtAuthGuard } from '../auth/auth.guard';
+import { AddProgressDto } from './dto/add-progress.dto';
+import { UpdateProgressDto } from './dto/update-progress.dto';
 
 @Controller('progress')
 @UseGuards(JwtAuthGuard)
 export class ProgressController {
-  constructor(
-    private readonly progressService: ProgressService,
-  ) {}
+  constructor(private readonly progressService: ProgressService) {}
 
   @Get()
   findAll(@Request() req: any) {
@@ -32,33 +31,26 @@ export class ProgressController {
   }
 
   @Post()
-  async addToProgress(
-    @Request() req: any,
-    @Body() body: { songId: number; status?: ProgressStatus },
-  ) {
-    const progress = await this.progressService.addToProgress(
+  async addToProgress(@Request() req: any, @Body() dto: AddProgressDto) {
+    return this.progressService.addToProgress(
       req.user.id,
-      body.songId,
-      body.status || 'want_to_learn',
+      dto.songId,
+      dto.status || 'want_to_learn',
     );
-
-    return progress;
   }
 
   @Put(':songId')
   async updateProgress(
     @Request() req: any,
     @Param('songId', ParseIntPipe) songId: number,
-    @Body() body: { status: ProgressStatus; position: number },
+    @Body() dto: UpdateProgressDto,
   ) {
-    const progress = await this.progressService.updateProgress(
+    return this.progressService.updateProgress(
       req.user.id,
       songId,
-      body.status,
-      body.position,
+      dto.status,
+      dto.position,
     );
-
-    return progress;
   }
 
   @Delete(':songId')
@@ -67,7 +59,6 @@ export class ProgressController {
     @Param('songId', ParseIntPipe) songId: number,
   ) {
     await this.progressService.removeFromProgress(req.user.id, songId);
-
     return { message: 'Removed from progress' };
   }
 }

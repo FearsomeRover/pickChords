@@ -63,10 +63,23 @@ export class SongsService {
     const result = await this.db.query(query, params);
     const songs: SongWithExpanded[] = result.rows;
 
-    // Expand chords and tags for each song
+    // Batch load all chords and tags to avoid N+1 queries
+    const allChordIds = [...new Set(songs.flatMap(s => s.chord_ids || []))];
+    const allTagIds = [...new Set(songs.flatMap(s => s.tag_ids || []))];
+
+    const [allChords, allTags] = await Promise.all([
+      allChordIds.length > 0 ? this.chordsService.findByIds(allChordIds) : [],
+      allTagIds.length > 0 ? this.tagsService.findByIds(allTagIds) : [],
+    ]);
+
+    // Create lookup maps for O(1) access
+    const chordsMap = new Map(allChords.map(c => [c.id, c]));
+    const tagsMap = new Map(allTags.map(t => [t.id, t]));
+
+    // Map chords and tags to each song
     for (const song of songs) {
-      song.chords = await this.chordsService.findByIds(song.chord_ids || []);
-      song.tags = await this.tagsService.findByIds(song.tag_ids || []);
+      song.chords = (song.chord_ids || []).map(id => chordsMap.get(id)).filter(Boolean);
+      song.tags = (song.tag_ids || []).map(id => tagsMap.get(id)).filter(Boolean);
     }
 
     return songs;

@@ -19,16 +19,19 @@ import {
   horizontalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Chord, StrummingPattern } from '../types'
+import { Chord, StrummingPattern, Tag } from '../types'
 import { useAuth } from '../hooks/useAuth'
 import {
   useSong,
   useChords,
+  useTags,
   useUpdateSong,
   useDeleteSong,
 } from '../hooks/useQueries'
 import ChordDiagram from '../components/ChordDiagram'
 import StrummingPatternEditor from '../components/StrummingPatternEditor'
+import TagChip from '../components/TagChip'
+import { FormInput, FormTextarea, Button, ErrorCard, LoadingSpinner } from '../components/ui'
 
 interface SortableChordProps {
   chord: Chord
@@ -79,15 +82,21 @@ export default function EditSongPage() {
 
   const { data: song, isLoading, error } = useSong(songId)
   const { data: allChords = [] } = useChords()
+  const { data: allTags = [] } = useTags()
   const updateSongMutation = useUpdateSong()
   const deleteSongMutation = useDeleteSong()
 
   // Local state for editing
+  const [name, setName] = useState('')
+  const [artist, setArtist] = useState('')
+  const [notes, setNotes] = useState('')
   const [chordIds, setChordIds] = useState<number[]>([])
   const [chords, setChords] = useState<Chord[]>([])
+  const [tagIds, setTagIds] = useState<number[]>([])
   const [strummingPattern, setStrummingPattern] = useState<StrummingPattern | undefined>(undefined)
   const [hasChanges, setHasChanges] = useState(false)
   const [showChordPicker, setShowChordPicker] = useState(false)
+  const [showTagPicker, setShowTagPicker] = useState(false)
   const [activeChord, setActiveChord] = useState<Chord | null>(null)
   const isInitialLoad = useRef(true)
 
@@ -98,8 +107,12 @@ export default function EditSongPage() {
   useEffect(() => {
     if (song) {
       isInitialLoad.current = true
+      setName(song.name || '')
+      setArtist(song.artist || '')
+      setNotes(song.notes || '')
       setChordIds(song.chord_ids || [])
       setChords(song.chords || [])
+      setTagIds(song.tag_ids || [])
       setStrummingPattern(song.strumming_pattern)
       // Allow a brief moment for StrummingPatternEditor to initialize
       setTimeout(() => {
@@ -162,6 +175,20 @@ export default function EditSongPage() {
     }
   }
 
+  const handleToggleTag = (tagId: number) => {
+    if (tagIds.includes(tagId)) {
+      setTagIds(tagIds.filter(id => id !== tagId))
+    } else {
+      setTagIds([...tagIds, tagId])
+    }
+    setHasChanges(true)
+  }
+
+  const handleRemoveTag = (tagId: number) => {
+    setTagIds(tagIds.filter(id => id !== tagId))
+    setHasChanges(true)
+  }
+
   const handleDeletePattern = () => {
     if (!confirm('Remove strumming pattern from this song?')) return
     setStrummingPattern(undefined)
@@ -169,16 +196,16 @@ export default function EditSongPage() {
   }
 
   const handleSave = () => {
-    if (!song) return
+    if (!song || !name.trim()) return
 
     updateSongMutation.mutate(
       {
         id: song.id,
-        name: song.name,
-        artist: song.artist,
-        notes: song.notes,
+        name: name.trim(),
+        artist: artist.trim() || undefined,
+        notes: notes.trim() || undefined,
         chord_ids: chordIds,
-        tag_ids: song.tag_ids,
+        tag_ids: tagIds,
         strumming_pattern: strummingPattern || null,
       },
       {
@@ -204,34 +231,28 @@ export default function EditSongPage() {
     chord => !chords.some(c => c.id === chord.id)
   )
 
+  // Get selected tags
+  const selectedTags = allTags.filter(tag => tagIds.includes(tag.id))
+  const availableTags = allTags.filter(tag => !tagIds.includes(tag.id))
+
   if (isLoading) {
-    return <div className="text-center py-10 text-light-gray">Loading...</div>
+    return <LoadingSpinner />
   }
 
   if (error || !song) {
     return (
-      <div className="text-[#D64545] bg-[rgba(214,69,69,0.1)] border-2 border-[#D64545] rounded-lg text-center p-5">
-        {error instanceof Error ? error.message : 'Song not found'}
-        <button
-          className="mt-4 px-5 py-2.5 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer"
-          onClick={() => navigate(-1)}
-        >
-          Go Back
-        </button>
+      <div className="text-center">
+        <ErrorCard message={error instanceof Error ? error.message : 'Song not found'} />
+        <Button className="mt-4" onClick={() => navigate(-1)}>Go Back</Button>
       </div>
     )
   }
 
   if (!canEdit) {
     return (
-      <div className="text-[#D64545] bg-[rgba(214,69,69,0.1)] border-2 border-[#D64545] rounded-lg text-center p-5">
-        You don't have permission to edit this song.
-        <button
-          className="mt-4 px-5 py-2.5 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer"
-          onClick={() => navigate(`/songs/${song.id}`)}
-        >
-          Go Back
-        </button>
+      <div className="text-center">
+        <ErrorCard message="You don't have permission to edit this song." />
+        <Button className="mt-4" onClick={() => navigate(`/songs/${song.id}`)}>Go Back</Button>
       </div>
     )
   }
@@ -245,17 +266,89 @@ export default function EditSongPage() {
             className="text-light-gray hover:text-deep-navy transition-colors mb-2"
             onClick={() => navigate(`/songs/${song.id}`)}
           >
-            &larr; Back to {song.name}
+            &larr; Back to song
           </button>
           <h1 className="text-3xl font-bold text-deep-navy">Edit Song</h1>
-          <p className="text-light-gray">{song.name} {song.artist && `- ${song.artist}`}</p>
         </div>
-        <button
-          className="px-4 py-2 text-base rounded-lg font-medium bg-off-white text-[#D64545] border-2 border-[#D4C9BC] transition-all duration-200 hover:border-[#D64545] cursor-pointer"
-          onClick={handleDelete}
-        >
-          Delete Song
-        </button>
+        <Button variant="danger" onClick={handleDelete}>Delete Song</Button>
+      </div>
+
+      {/* Song Details Section */}
+      <div className="bg-off-white rounded-xl p-6 border-2 border-[#D4C9BC] mb-6">
+        <h2 className="text-xl font-semibold text-deep-navy mb-4">Song Details</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormInput
+            label="Song Name"
+            required
+            value={name}
+            onChange={(e) => { setName(e.target.value); setHasChanges(true) }}
+            placeholder="Enter song name"
+          />
+          <FormInput
+            label="Artist"
+            value={artist}
+            onChange={(e) => { setArtist(e.target.value); setHasChanges(true) }}
+            placeholder="Enter artist name"
+          />
+        </div>
+
+        <FormTextarea
+          label="Notes / Description"
+          value={notes}
+          onChange={(e) => { setNotes(e.target.value); setHasChanges(true) }}
+          placeholder="Add notes, lyrics, or instructions..."
+          rows={4}
+        />
+      </div>
+
+      {/* Tags Section */}
+      <div className="bg-off-white rounded-xl p-6 border-2 border-[#D4C9BC] mb-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold text-deep-navy">Tags</h2>
+          <Button
+            variant={showTagPicker ? 'primary' : 'secondary'}
+            onClick={() => setShowTagPicker(!showTagPicker)}
+            className="text-sm px-4 py-2"
+          >
+            {showTagPicker ? 'Done' : 'Edit Tags'}
+          </Button>
+        </div>
+
+        {/* Current tags */}
+        {selectedTags.length > 0 ? (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {selectedTags.map(tag => (
+              <TagChip
+                key={tag.id}
+                tag={tag}
+                selected
+                onRemove={() => handleRemoveTag(tag.id)}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-light-gray text-sm mb-4">No tags added to this song yet.</p>
+        )}
+
+        {/* Tag picker */}
+        {showTagPicker && availableTags.length > 0 && (
+          <div className="bg-cream rounded-lg p-4 border-2 border-[#D4C9BC]">
+            <p className="text-deep-navy font-medium mb-3 text-sm">Click to add tags:</p>
+            <div className="flex flex-wrap gap-2">
+              {availableTags.map(tag => (
+                <TagChip
+                  key={tag.id}
+                  tag={tag}
+                  onClick={() => handleToggleTag(tag.id)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+        {showTagPicker && availableTags.length === 0 && (
+          <p className="text-light-gray text-sm">All tags are already added to this song.</p>
+        )}
       </div>
 
       {/* Strumming Pattern Section */}
@@ -272,12 +365,13 @@ export default function EditSongPage() {
       <div className="bg-off-white rounded-xl p-6 border-2 border-[#D4C9BC] mb-6">
         <div className="flex justify-between items-center mb-5">
           <h2 className="text-xl font-semibold text-deep-navy">Chords</h2>
-          <button
-            className="px-4 py-2 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer"
+          <Button
+            variant={showChordPicker ? 'primary' : 'secondary'}
             onClick={() => setShowChordPicker(!showChordPicker)}
+            className="text-sm px-4 py-2"
           >
             {showChordPicker ? 'Done' : 'Add Chords'}
-          </button>
+          </Button>
         </div>
 
         <p className="text-sm text-light-gray mb-4">
@@ -346,19 +440,16 @@ export default function EditSongPage() {
         <div className="flex justify-between items-center bg-mustard-yellow rounded-lg p-4 sticky bottom-4">
           <span className="text-deep-navy font-medium">You have unsaved changes</span>
           <div className="flex gap-2">
-            <button
-              className="px-4 py-2 text-sm rounded-lg font-medium bg-off-white text-deep-navy border-2 border-[#D4C9BC] transition-all duration-200 hover:border-deep-navy cursor-pointer"
-              onClick={() => navigate(`/songs/${song.id}`)}
-            >
+            <Button variant="secondary" onClick={() => navigate(`/songs/${song.id}`)}>
               Discard
-            </button>
-            <button
-              className="px-5 py-2.5 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            </Button>
+            <Button
               onClick={handleSave}
-              disabled={updateSongMutation.isPending}
+              loading={updateSongMutation.isPending}
+              disabled={!name.trim()}
             >
-              {updateSongMutation.isPending ? 'Saving...' : 'Save Changes'}
-            </button>
+              Save Changes
+            </Button>
           </div>
         </div>
       )}
