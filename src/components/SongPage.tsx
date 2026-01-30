@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ProgressStatus } from '../types'
 import { useAuth } from '../hooks/useAuth'
+import { useIsMobile } from '../hooks/useIsMobile'
 import {
   useSong,
   useToggleFavorite,
@@ -14,6 +15,7 @@ import StrummingPatternDisplay from './StrummingPatternDisplay'
 
 export default function SongPage() {
   const { user } = useAuth()
+  const isMobile = useIsMobile()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const songId = id ? parseInt(id, 10) : undefined
@@ -111,7 +113,8 @@ export default function SongPage() {
               {song.is_favorite ? '\u2605' : '\u2606'}
             </button>
           )}
-          {user && !progressItem && (
+          {/* Add to Progress and Edit buttons hidden on mobile */}
+          {!isMobile && user && !progressItem && (
             <div className="relative">
               <button
                 className="px-3 py-1.5 text-sm rounded-lg font-medium bg-teal-green text-off-white transition-all duration-200 hover:opacity-80 border-0 cursor-pointer"
@@ -138,7 +141,7 @@ export default function SongPage() {
               )}
             </div>
           )}
-          {canEdit && (
+          {!isMobile && canEdit && (
             <button
               className="px-4 py-2 text-base rounded-lg font-medium bg-deep-navy text-off-white transition-all duration-200 hover:bg-[#001a3d] border-0 cursor-pointer"
               onClick={() => navigate(`/songs/${song.id}/edit`)}
@@ -169,7 +172,7 @@ export default function SongPage() {
         <div className="mb-6">
           <StrummingPatternDisplay
             pattern={song.strumming_pattern}
-            onEdit={canEdit ? () => navigate(`/songs/${song.id}/edit`) : undefined}
+            onEdit={!isMobile && canEdit ? () => navigate(`/songs/${song.id}/edit`) : undefined}
           />
         </div>
       )}

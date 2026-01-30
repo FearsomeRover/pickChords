@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Chord, StringData } from '../types'
 import { useAuth } from '../hooks/useAuth'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { useChords, useCreateChord, useUpdateChord, useDeleteChord } from '../hooks/useQueries'
 import ChordDiagram from '../components/ChordDiagram'
 
 function ChordsPage() {
   const { user } = useAuth()
+  const isMobile = useIsMobile()
   const [searchParams, setSearchParams] = useSearchParams()
   const searchTerm = searchParams.get('search') || ''
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm)
@@ -171,8 +173,8 @@ function ChordsPage() {
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-6">
           {chords.map((chord) => (
             <div key={chord.id} className="bg-off-white rounded-xl p-5 text-center transition-all duration-200 border-2 border-[#D4C9BC] hover:-translate-y-1 hover:shadow-[0_8px_24px_rgba(0,22,45,0.1)] hover:border-deep-navy relative">
-              {/* 3-dot menu for admins */}
-              {isAdmin && (
+              {/* 3-dot menu for admins (hidden on mobile) */}
+              {isAdmin && !isMobile && (
                 <div className="absolute top-3 right-3">
                   <button
                     className="w-8 h-8 flex items-center justify-center bg-off-white text-deep-navy rounded-lg border-2 border-[#D4C9BC] transition-all duration-200 hover:border-deep-navy cursor-pointer"
@@ -210,8 +212,8 @@ function ChordsPage() {
         </div>
       )}
 
-      {/* Only show add button for admins */}
-      {isAdmin && (
+      {/* Only show add button for admins (hidden on mobile) */}
+      {isAdmin && !isMobile && (
         <button
           className="fixed bottom-[30px] right-[30px] w-[60px] h-[60px] rounded-full border-0 bg-deep-navy text-off-white text-3xl cursor-pointer shadow-[0_4px_12px_rgba(0,22,45,0.4)] transition-all duration-200 hover:scale-110 hover:bg-[#001a3d]"
           onClick={openAddChordModal}
@@ -220,7 +222,7 @@ function ChordsPage() {
         </button>
       )}
 
-      {showChordModal && (
+      {!isMobile && showChordModal && (
         <div className="fixed inset-0 bg-[rgba(15,27,46,0.7)] backdrop-blur-sm flex items-center justify-center z-[1000]" onClick={closeChordModal}>
           <div className="bg-off-white rounded-2xl p-8 max-w-[500px] w-[90%] max-h-[90vh] overflow-y-auto border-2 border-[#D4C9BC] shadow-[0_12px_48px_rgba(15,27,46,0.2)]" onClick={(e) => e.stopPropagation()}>
             <h2 className="mb-5 text-deep-navy">{editingChordId ? 'Edit Chord' : 'Add New Chord'}</h2>

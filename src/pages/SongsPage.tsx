@@ -1,6 +1,7 @@
 import { useState, lazy, Suspense } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { useSongs, useTags, useToggleFavorite } from '../hooks/useQueries'
 import SongCard from '../components/SongCard'
 import TagChip from '../components/TagChip'
@@ -9,6 +10,7 @@ const AuthModal = lazy(() => import('../components/AuthModal'))
 
 function SongsPage() {
   const { user } = useAuth()
+  const isMobile = useIsMobile()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -125,12 +127,15 @@ function SongsPage() {
         </div>
       )}
 
-      <button
-        className="fixed bottom-[30px] right-[30px] w-[60px] h-[60px] rounded-full border-0 bg-deep-navy text-off-white text-3xl cursor-pointer shadow-[0_4px_12px_rgba(0,22,45,0.4)] transition-all duration-200 hover:scale-110 hover:bg-[#001a3d]"
-        onClick={() => navigate('/songs/new')}
-      >
-        +
-      </button>
+      {/* Add song button (hidden on mobile) */}
+      {!isMobile && (
+        <button
+          className="fixed bottom-[30px] right-[30px] w-[60px] h-[60px] rounded-full border-0 bg-deep-navy text-off-white text-3xl cursor-pointer shadow-[0_4px_12px_rgba(0,22,45,0.4)] transition-all duration-200 hover:scale-110 hover:bg-[#001a3d]"
+          onClick={() => navigate('/songs/new')}
+        >
+          +
+        </button>
+      )}
 
       {showAuthModal && (
         <Suspense fallback={null}>
