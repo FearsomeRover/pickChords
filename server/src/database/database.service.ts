@@ -121,6 +121,8 @@ export class DatabaseService implements OnModuleInit {
           chord_ids JSONB NOT NULL DEFAULT '[]',
           tag_ids JSONB NOT NULL DEFAULT '[]',
           strumming_pattern JSONB,
+          capo INTEGER,
+          links JSONB NOT NULL DEFAULT '[]',
           user_id INTEGER REFERENCES users(id),
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -148,6 +150,32 @@ export class DatabaseService implements OnModuleInit {
             WHERE table_name='songs' AND column_name='user_id'
           ) THEN
             ALTER TABLE songs ADD COLUMN user_id INTEGER REFERENCES users(id);
+          END IF;
+        END $$;
+      `);
+
+      // Add capo column if it doesn't exist (for existing databases)
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name='songs' AND column_name='capo'
+          ) THEN
+            ALTER TABLE songs ADD COLUMN capo INTEGER;
+          END IF;
+        END $$;
+      `);
+
+      // Add links column if it doesn't exist (for existing databases)
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name='songs' AND column_name='links'
+          ) THEN
+            ALTER TABLE songs ADD COLUMN links JSONB NOT NULL DEFAULT '[]';
           END IF;
         END $$;
       `);

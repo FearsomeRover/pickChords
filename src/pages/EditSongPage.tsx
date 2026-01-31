@@ -19,7 +19,8 @@ import {
   horizontalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Chord, StrummingPattern, Tag } from '../types'
+import { Plus, X } from 'lucide-react'
+import { Chord, StrummingPattern } from '../types'
 import { useAuth } from '../hooks/useAuth'
 import {
   useSong,
@@ -90,6 +91,9 @@ export default function EditSongPage() {
   const [name, setName] = useState('')
   const [artist, setArtist] = useState('')
   const [notes, setNotes] = useState('')
+  const [capo, setCapo] = useState<number | undefined>(undefined)
+  const [links, setLinks] = useState<string[]>([])
+  const [newLink, setNewLink] = useState('')
   const [chordIds, setChordIds] = useState<number[]>([])
   const [chords, setChords] = useState<Chord[]>([])
   const [tagIds, setTagIds] = useState<number[]>([])
@@ -110,6 +114,8 @@ export default function EditSongPage() {
       setName(song.name || '')
       setArtist(song.artist || '')
       setNotes(song.notes || '')
+      setCapo(song.capo)
+      setLinks(song.links || [])
       setChordIds(song.chord_ids || [])
       setChords(song.chords || [])
       setTagIds(song.tag_ids || [])
@@ -195,6 +201,24 @@ export default function EditSongPage() {
     setHasChanges(true)
   }
 
+  const handleAddLink = () => {
+    if (!newLink.trim()) return
+    try {
+      // Validate URL
+      new URL(newLink.trim())
+      setLinks([...links, newLink.trim()])
+      setNewLink('')
+      setHasChanges(true)
+    } catch {
+      alert('Please enter a valid URL')
+    }
+  }
+
+  const handleRemoveLink = (index: number) => {
+    setLinks(links.filter((_, i) => i !== index))
+    setHasChanges(true)
+  }
+
   const handleSave = () => {
     if (!song || !name.trim()) return
 
@@ -204,6 +228,8 @@ export default function EditSongPage() {
         name: name.trim(),
         artist: artist.trim() || undefined,
         notes: notes.trim() || undefined,
+        capo: capo,
+        links: links,
         chord_ids: chordIds,
         tag_ids: tagIds,
         strumming_pattern: strummingPattern || null,
@@ -277,7 +303,7 @@ export default function EditSongPage() {
       <div className="bg-off-white rounded-xl p-6 border-2 border-[#D4C9BC] mb-6">
         <h2 className="text-xl font-semibold text-deep-navy mb-4">Song Details</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormInput
             label="Song Name"
             required
@@ -291,6 +317,25 @@ export default function EditSongPage() {
             onChange={(e) => { setArtist(e.target.value); setHasChanges(true) }}
             placeholder="Enter artist name"
           />
+          <div>
+            <label className="block text-sm font-medium text-deep-navy mb-1">Capo Position</label>
+            <select
+              className="w-full px-4 py-3 text-base border-2 border-[#D4C9BC] rounded-lg bg-off-white text-deep-navy outline-none transition-all duration-200 focus:border-deep-navy"
+              value={capo || ''}
+              onChange={(e) => {
+                const val = e.target.value ? parseInt(e.target.value, 10) : undefined
+                setCapo(val)
+                setHasChanges(true)
+              }}
+            >
+              <option value="">No capo</option>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((fret) => (
+                <option key={fret} value={fret}>
+                  {fret}{fret === 1 ? 'st' : fret === 2 ? 'nd' : fret === 3 ? 'rd' : 'th'} fret
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <FormTextarea
@@ -300,6 +345,57 @@ export default function EditSongPage() {
           placeholder="Add notes, lyrics, or instructions..."
           rows={4}
         />
+
+        {/* Links Section */}
+        <div className="mt-4">
+          <label className="block text-sm font-medium text-deep-navy mb-2">
+            External Links
+            <span className="text-light-gray font-normal ml-2">(Songsterr, Ultimate Guitar, YouTube)</span>
+          </label>
+
+          {/* Current links */}
+          {links.length > 0 && (
+            <div className="space-y-2 mb-3">
+              {links.map((link, index) => (
+                <div key={index} className="flex items-center gap-2 bg-cream rounded-lg px-3 py-2">
+                  <span className="flex-1 text-sm text-deep-navy truncate">{link}</span>
+                  <button
+                    type="button"
+                    className="p-1 text-light-gray hover:text-coral transition-colors"
+                    onClick={() => handleRemoveLink(index)}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add new link */}
+          <div className="flex gap-2">
+            <input
+              type="url"
+              className="flex-1 px-4 py-2 text-base border-2 border-[#D4C9BC] rounded-lg bg-off-white text-deep-navy outline-none transition-all duration-200 focus:border-deep-navy placeholder:text-light-gray"
+              placeholder="Paste a link here..."
+              value={newLink}
+              onChange={(e) => setNewLink(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  handleAddLink()
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="px-3 py-2 bg-teal-green text-off-white rounded-lg transition-all duration-200 hover:opacity-80 flex items-center gap-1"
+              onClick={handleAddLink}
+            >
+              <Plus size={18} />
+              Add
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Tags Section */}

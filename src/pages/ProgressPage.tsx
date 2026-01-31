@@ -22,7 +22,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useAuth } from '../hooks/useAuth'
 import { useProgress, useUpdateProgress, useRemoveFromProgress } from '../hooks/useQueries'
 import { SongProgress, ProgressStatus } from '../types'
-import { PROGRESS_PROGRESS_COLUMNS } from '../constants/progress'
+import { PROGRESS_COLUMNS } from '../constants/progress'
 import { Button, ErrorCard, LoadingSpinner } from '../components/ui'
 
 interface ProgressCardProps {
@@ -98,7 +98,7 @@ function Column({
   onRemove,
   onCardClick,
 }: {
-  column: typeof PROGRESS_PROGRESS_COLUMNS[number]
+  column: typeof PROGRESS_COLUMNS[number]
   items: SongProgress[]
   onRemove: (songId: number) => void
   onCardClick: (songId: number) => void

@@ -19,6 +19,8 @@ export interface Song {
   chord_ids: number[];
   tag_ids: number[];
   strumming_pattern?: StrummingPattern;
+  capo?: number;
+  links?: string[];
   user_id?: number;
   created_at: string;
 }
@@ -107,11 +109,11 @@ export class SongsService {
   }
 
   async create(createSongDto: CreateSongDto, userId: number): Promise<Song> {
-    const { name, artist, notes, chord_ids = [], tag_ids = [], strumming_pattern } = createSongDto;
+    const { name, artist, notes, chord_ids = [], tag_ids = [], strumming_pattern, capo, links = [] } = createSongDto;
 
     const result = await this.db.query(
-      `INSERT INTO songs (name, artist, notes, chord_ids, tag_ids, strumming_pattern, user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO songs (name, artist, notes, chord_ids, tag_ids, strumming_pattern, capo, links, user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
       [
         name,
@@ -120,6 +122,8 @@ export class SongsService {
         JSON.stringify(chord_ids),
         JSON.stringify(tag_ids),
         strumming_pattern ? JSON.stringify(strumming_pattern) : null,
+        capo || null,
+        JSON.stringify(links),
         userId
       ]
     );
@@ -133,7 +137,7 @@ export class SongsService {
   }
 
   async update(id: number, updateSongDto: Partial<CreateSongDto>): Promise<Song> {
-    const { name, artist, notes, chord_ids, tag_ids, strumming_pattern } = updateSongDto;
+    const { name, artist, notes, chord_ids, tag_ids, strumming_pattern, capo, links } = updateSongDto;
 
     // Get the old chord_ids if we're updating chords
     let oldChordIds: number[] = [];
@@ -151,8 +155,10 @@ export class SongsService {
            notes = COALESCE($3, notes),
            chord_ids = COALESCE($4, chord_ids),
            tag_ids = COALESCE($5, tag_ids),
-           strumming_pattern = COALESCE($6, strumming_pattern)
-       WHERE id = $7
+           strumming_pattern = COALESCE($6, strumming_pattern),
+           capo = CASE WHEN $7::boolean THEN $8 ELSE capo END,
+           links = COALESCE($9, links)
+       WHERE id = $10
        RETURNING *`,
       [
         name,
@@ -161,6 +167,9 @@ export class SongsService {
         chord_ids ? JSON.stringify(chord_ids) : null,
         tag_ids ? JSON.stringify(tag_ids) : null,
         strumming_pattern !== undefined ? JSON.stringify(strumming_pattern) : null,
+        capo !== undefined, // $7: whether to update capo
+        capo || null,       // $8: the new capo value
+        links ? JSON.stringify(links) : null,
         id,
       ]
     );

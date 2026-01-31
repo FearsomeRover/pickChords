@@ -11,6 +11,7 @@ import {
 import ChordDiagram from './ChordDiagram'
 import TagChip from './TagChip'
 import StrummingPatternDisplay from './StrummingPatternDisplay'
+import SongLinks from './SongLinks'
 
 export default function SongPage() {
   const { user } = useAuth()
@@ -89,6 +90,16 @@ export default function SongPage() {
             )}
           </div>
           {song.artist && <p className="text-deep-navy/70 text-lg">{song.artist}</p>}
+          {song.capo && (
+            <p className="text-deep-navy/70 text-sm mt-1">
+              Capo: {song.capo}{song.capo === 1 ? 'st' : song.capo === 2 ? 'nd' : song.capo === 3 ? 'rd' : 'th'} fret
+            </p>
+          )}
+          {song.links && song.links.length > 0 && (
+            <div className="mt-2">
+              <SongLinks links={song.links} />
+            </div>
+          )}
         </div>
         <div className="flex gap-2 items-center">
           {/* Add to Progress and Edit buttons hidden on mobile */}

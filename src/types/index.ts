@@ -37,6 +37,8 @@ export interface Song {
   chords?: Chord[];
   tags?: Tag[];
   strumming_pattern?: StrummingPattern;
+  capo?: number;
+  links?: string[];
   user_id?: number;
   created_at: string;
 }

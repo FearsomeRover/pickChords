@@ -13,7 +13,14 @@ export default function SongCard({ song }: SongCardProps) {
       className="block bg-off-white rounded-xl p-5 cursor-pointer transition-all duration-200 border-2 border-[#D4C9BC] hover:-translate-y-1 hover:shadow-[0_8px_24px_rgba(0,22,45,0.1)] hover:border-deep-navy no-underline text-deep-navy"
     >
       <h3 className="text-xl mb-2">{song.name}</h3>
-      {song.artist && <p className="text-light-gray text-sm mb-3">{song.artist}</p>}
+      <div className="flex items-center gap-2 mb-3">
+        {song.artist && <p className="text-light-gray text-sm">{song.artist}</p>}
+        {song.capo && (
+          <span className="text-xs bg-golden-orange/20 text-deep-navy px-2 py-0.5 rounded">
+            Capo {song.capo}
+          </span>
+        )}
+      </div>
       <div className="flex flex-wrap gap-1.5 mb-3">
         {song.chords?.slice(0, 4).map((chord) => (
           <span key={chord.id} className="bg-teal-green text-off-white px-2.5 py-1 rounded text-[0.85rem]">

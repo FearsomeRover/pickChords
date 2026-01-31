@@ -78,6 +78,8 @@ export function useCreateSong() {
       name: string
       artist?: string
       notes?: string
+      capo?: number
+      links?: string[]
       chord_ids?: number[]
       tag_ids?: number[]
     }) => api.post<Song>('/api/songs', data),
@@ -97,6 +99,8 @@ export function useUpdateSong() {
       name: string
       artist?: string
       notes?: string
+      capo?: number
+      links?: string[]
       chord_ids?: number[]
       tag_ids?: number[]
       strumming_pattern?: any

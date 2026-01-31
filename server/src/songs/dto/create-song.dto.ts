@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, IsInt, IsObject, ValidateNested, IsNumber, IsIn } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsInt, IsObject, ValidateNested, IsNumber, IsIn, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class StrummingPatternDto {
@@ -45,4 +45,15 @@ export class CreateSongDto {
   @ValidateNested()
   @Type(() => StrummingPatternDto)
   strumming_pattern?: StrummingPatternDto;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  capo?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  links?: string[];
 }
