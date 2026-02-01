@@ -24,8 +24,37 @@ export default function TabViewer({ tablature, title, artist }: TabViewerProps) 
       apiRef.current = null
     }
 
-    // Check if we have any measures
-    if (!tablature.measures || tablature.measures.length === 0) {
+    // Validate tablature structure
+    console.log('TabViewer received tablature:', JSON.stringify(tablature, null, 2))
+
+    if (!tablature || typeof tablature !== 'object') {
+      console.log('TabViewer: tablature is null or not an object')
+      setIsLoading(false)
+      setError('Invalid tablature data')
+      return
+    }
+
+    // Check if we have any measures - handle both direct and nested structures
+    let measures = tablature.measures
+
+    // Sometimes the data might come as a string from the database
+    if (typeof tablature === 'string') {
+      try {
+        const parsed = JSON.parse(tablature)
+        measures = parsed.measures
+        console.log('TabViewer: parsed string tablature')
+      } catch (e) {
+        console.log('TabViewer: failed to parse string tablature')
+        setIsLoading(false)
+        setError('Invalid tablature format')
+        return
+      }
+    }
+
+    console.log('TabViewer measures:', measures)
+
+    if (!measures || !Array.isArray(measures) || measures.length === 0) {
+      console.log('TabViewer: no valid measures found')
       setIsLoading(false)
       setError('No tablature data')
       return
@@ -35,8 +64,14 @@ export default function TabViewer({ tablature, title, artist }: TabViewerProps) 
     setError(null)
 
     try {
+      // Ensure we have a proper tablature object with measures
+      const normalizedTablature: SongTablature = {
+        measures: measures,
+        tuning: tablature.tuning
+      }
+
       // Convert our data model to alphaTex
-      const tex = tablatureToAlphaTex(tablature, { title, artist })
+      const tex = tablatureToAlphaTex(normalizedTablature, { title, artist })
       console.log('Generated alphaTex:', tex)
 
       // Initialize AlphaTab

@@ -14,7 +14,24 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
 
   // Serve static files from dist folder in production
-  app.use(express.static(join(__dirname, '../../dist')));
+  // Configure proper MIME types for font files
+  app.use(express.static(join(__dirname, '../../dist'), {
+    setHeaders: (res, path) => {
+      if (path.endsWith('.woff2')) {
+        res.setHeader('Content-Type', 'font/woff2');
+      } else if (path.endsWith('.woff')) {
+        res.setHeader('Content-Type', 'font/woff');
+      } else if (path.endsWith('.otf')) {
+        res.setHeader('Content-Type', 'font/otf');
+      } else if (path.endsWith('.ttf')) {
+        res.setHeader('Content-Type', 'font/ttf');
+      } else if (path.endsWith('.eot')) {
+        res.setHeader('Content-Type', 'application/vnd.ms-fontobject');
+      } else if (path.endsWith('.sf2') || path.endsWith('.sf3')) {
+        res.setHeader('Content-Type', 'application/octet-stream');
+      }
+    }
+  }));
 
   // Catch-all for SPA routing - serve index.html for non-API routes
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
