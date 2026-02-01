@@ -86,13 +86,12 @@ export default function TabViewer({ tablature, title, artist }: TabViewerProps) 
       settings.display.stretchForce = 0.8
 
       // Custom colors (using type assertion since fromJson can return null but won't with valid hex)
-      // Make staff lines transparent/invisible - only show tab numbers
-      const staffLineColor = new alphaTab.model.Color(0, 0, 0, 0) // Transparent
+      const staffLineColor = alphaTab.model.Color.fromJson('#B8BAB8')
       const mainGlyphColor = alphaTab.model.Color.fromJson('#00162D')
       const secondaryGlyphColor = alphaTab.model.Color.fromJson('#2D6A5C')
       const barSeparatorColor = alphaTab.model.Color.fromJson('#B8BAB8')
 
-      settings.display.resources.staffLineColor = staffLineColor
+      if (staffLineColor) settings.display.resources.staffLineColor = staffLineColor
       if (mainGlyphColor) settings.display.resources.mainGlyphColor = mainGlyphColor
       if (secondaryGlyphColor) settings.display.resources.secondaryGlyphColor = secondaryGlyphColor
       if (barSeparatorColor) settings.display.resources.barSeparatorColor = barSeparatorColor
