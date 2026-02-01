@@ -123,6 +123,7 @@ export class DatabaseService implements OnModuleInit {
           strumming_pattern JSONB,
           capo INTEGER,
           links JSONB NOT NULL DEFAULT '[]',
+          tablature JSONB,
           user_id INTEGER REFERENCES users(id),
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -176,6 +177,19 @@ export class DatabaseService implements OnModuleInit {
             WHERE table_name='songs' AND column_name='links'
           ) THEN
             ALTER TABLE songs ADD COLUMN links JSONB NOT NULL DEFAULT '[]';
+          END IF;
+        END $$;
+      `);
+
+      // Add tablature column if it doesn't exist (for existing databases)
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name='songs' AND column_name='tablature'
+          ) THEN
+            ALTER TABLE songs ADD COLUMN tablature JSONB;
           END IF;
         END $$;
       `);

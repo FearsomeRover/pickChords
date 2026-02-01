@@ -20,7 +20,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Plus, X } from 'lucide-react'
-import { Chord, StrummingPattern } from '../types'
+import { Chord, StrummingPattern, SongTablature } from '../types'
 import { useAuth } from '../hooks/useAuth'
 import {
   useSong,
@@ -31,6 +31,7 @@ import {
 } from '../hooks/useQueries'
 import ChordDiagram from '../components/ChordDiagram'
 import StrummingPatternEditor from '../components/StrummingPatternEditor'
+import TabEditor from '../components/TabEditor'
 import TagChip from '../components/TagChip'
 import { FormInput, FormTextarea, Button, ErrorCard, LoadingSpinner } from '../components/ui'
 
@@ -94,6 +95,7 @@ export default function EditSongPage() {
   const [capo, setCapo] = useState<number | undefined>(undefined)
   const [links, setLinks] = useState<string[]>([])
   const [newLink, setNewLink] = useState('')
+  const [tablature, setTablature] = useState<SongTablature | undefined>(undefined)
   const [chordIds, setChordIds] = useState<number[]>([])
   const [chords, setChords] = useState<Chord[]>([])
   const [tagIds, setTagIds] = useState<number[]>([])
@@ -116,6 +118,7 @@ export default function EditSongPage() {
       setNotes(song.notes || '')
       setCapo(song.capo)
       setLinks(song.links || [])
+      setTablature(song.tablature)
       setChordIds(song.chord_ids || [])
       setChords(song.chords || [])
       setTagIds(song.tag_ids || [])
@@ -219,6 +222,13 @@ export default function EditSongPage() {
     setHasChanges(true)
   }
 
+  const handleTablatureChange = (newTablature: SongTablature | undefined) => {
+    setTablature(newTablature)
+    if (!isInitialLoad.current) {
+      setHasChanges(true)
+    }
+  }
+
   const handleSave = () => {
     if (!song || !name.trim()) return
 
@@ -230,6 +240,7 @@ export default function EditSongPage() {
         notes: notes.trim() || undefined,
         capo: capo,
         links: links,
+        tablature: tablature,
         chord_ids: chordIds,
         tag_ids: tagIds,
         strumming_pattern: strummingPattern || null,
@@ -454,6 +465,15 @@ export default function EditSongPage() {
           pattern={strummingPattern}
           onChange={handlePatternChange}
           onDelete={strummingPattern ? handleDeletePattern : undefined}
+        />
+      </div>
+
+      {/* Tablature Section */}
+      <div className="bg-off-white rounded-xl p-6 border-2 border-[#D4C9BC] mb-6">
+        <h2 className="text-xl font-semibold text-deep-navy mb-4">Tablature</h2>
+        <TabEditor
+          tablature={tablature}
+          onChange={handleTablatureChange}
         />
       </div>
 

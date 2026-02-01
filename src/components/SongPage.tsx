@@ -12,6 +12,7 @@ import ChordDiagram from './ChordDiagram'
 import TagChip from './TagChip'
 import StrummingPatternDisplay from './StrummingPatternDisplay'
 import SongLinks from './SongLinks'
+import TabViewer from './TabViewer'
 
 export default function SongPage() {
   const { user } = useAuth()
@@ -166,23 +167,57 @@ export default function SongPage() {
         </div>
       )}
 
-      <div className={`bg-off-white rounded-xl border-2 border-[#D4C9BC] ${isMobile ? 'p-4' : 'p-6'}`}>
-        <h4 className="text-lg font-semibold text-deep-navy mb-5">Chords</h4>
+      {/* Desktop split view: Chords on left, Tabs on right */}
+      {!isMobile && song.tablature && chords.length > 0 ? (
+        <div className="grid grid-cols-[minmax(280px,1fr)_2fr] gap-6">
+          {/* Chords Panel */}
+          <div className="bg-off-white rounded-xl border-2 border-[#D4C9BC] p-6">
+            <h4 className="text-lg font-semibold text-deep-navy mb-5">Chords</h4>
+            <div className="grid grid-cols-2 gap-3">
+              {chords.map((chord, index) => (
+                <div key={`${chord.id}-${index}`} className="flex justify-center">
+                  <ChordDiagram chord={chord} width={120} height={150} />
+                </div>
+              ))}
+            </div>
+          </div>
 
-        {chords.length > 0 ? (
-          <div className={`grid gap-4 ${isMobile ? 'grid-cols-2' : 'grid-cols-[repeat(auto-fill,minmax(200px,1fr))]'}`}>
-            {chords.map((chord, index) => (
-              <div key={`${chord.id}-${index}`} className="flex justify-center">
-                <ChordDiagram chord={chord} width={isMobile ? 110 : 180} height={isMobile ? 140 : 220} />
+          {/* Tablature Panel */}
+          <div className="bg-off-white rounded-xl border-2 border-[#D4C9BC] p-6">
+            <h4 className="text-lg font-semibold text-deep-navy mb-5">Tablature</h4>
+            <TabViewer tablature={song.tablature} />
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Chords Section (full width) */}
+          <div className={`bg-off-white rounded-xl border-2 border-[#D4C9BC] ${isMobile ? 'p-4' : 'p-6'} mb-6`}>
+            <h4 className="text-lg font-semibold text-deep-navy mb-5">Chords</h4>
+
+            {chords.length > 0 ? (
+              <div className={`grid gap-4 ${isMobile ? 'grid-cols-2' : 'grid-cols-[repeat(auto-fill,minmax(200px,1fr))]'}`}>
+                {chords.map((chord, index) => (
+                  <div key={`${chord.id}-${index}`} className="flex justify-center">
+                    <ChordDiagram chord={chord} width={isMobile ? 110 : 180} height={isMobile ? 140 : 220} />
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              <div className="text-center text-light-gray text-lg py-6">
+                No chords added to this song yet.{canEdit && ' Click "Edit" to add chords.'}
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="text-center text-light-gray text-lg py-6">
-            No chords added to this song yet.{canEdit && ' Click "Edit" to add chords.'}
-          </div>
-        )}
-      </div>
+
+          {/* Tablature Section (full width, below chords) */}
+          {song.tablature && (
+            <div className={`bg-off-white rounded-xl border-2 border-[#D4C9BC] ${isMobile ? 'p-4' : 'p-6'}`}>
+              <h4 className="text-lg font-semibold text-deep-navy mb-5">Tablature</h4>
+              <TabViewer tablature={song.tablature} />
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }

@@ -80,6 +80,7 @@ export function useCreateSong() {
       notes?: string
       capo?: number
       links?: string[]
+      tablature?: any
       chord_ids?: number[]
       tag_ids?: number[]
     }) => api.post<Song>('/api/songs', data),
@@ -101,6 +102,7 @@ export function useUpdateSong() {
       notes?: string
       capo?: number
       links?: string[]
+      tablature?: any
       chord_ids?: number[]
       tag_ids?: number[]
       strumming_pattern?: any

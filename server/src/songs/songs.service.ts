@@ -21,6 +21,7 @@ export interface Song {
   strumming_pattern?: StrummingPattern;
   capo?: number;
   links?: string[];
+  tablature?: any;
   user_id?: number;
   created_at: string;
 }
@@ -109,11 +110,11 @@ export class SongsService {
   }
 
   async create(createSongDto: CreateSongDto, userId: number): Promise<Song> {
-    const { name, artist, notes, chord_ids = [], tag_ids = [], strumming_pattern, capo, links = [] } = createSongDto;
+    const { name, artist, notes, chord_ids = [], tag_ids = [], strumming_pattern, capo, links = [], tablature } = createSongDto;
 
     const result = await this.db.query(
-      `INSERT INTO songs (name, artist, notes, chord_ids, tag_ids, strumming_pattern, capo, links, user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO songs (name, artist, notes, chord_ids, tag_ids, strumming_pattern, capo, links, tablature, user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         name,
@@ -124,6 +125,7 @@ export class SongsService {
         strumming_pattern ? JSON.stringify(strumming_pattern) : null,
         capo || null,
         JSON.stringify(links),
+        tablature ? JSON.stringify(tablature) : null,
         userId
       ]
     );
@@ -137,7 +139,7 @@ export class SongsService {
   }
 
   async update(id: number, updateSongDto: Partial<CreateSongDto>): Promise<Song> {
-    const { name, artist, notes, chord_ids, tag_ids, strumming_pattern, capo, links } = updateSongDto;
+    const { name, artist, notes, chord_ids, tag_ids, strumming_pattern, capo, links, tablature } = updateSongDto;
 
     // Get the old chord_ids if we're updating chords
     let oldChordIds: number[] = [];
@@ -157,8 +159,9 @@ export class SongsService {
            tag_ids = COALESCE($5, tag_ids),
            strumming_pattern = COALESCE($6, strumming_pattern),
            capo = CASE WHEN $7::boolean THEN $8 ELSE capo END,
-           links = COALESCE($9, links)
-       WHERE id = $10
+           links = COALESCE($9, links),
+           tablature = CASE WHEN $10::boolean THEN $11 ELSE tablature END
+       WHERE id = $12
        RETURNING *`,
       [
         name,
@@ -170,6 +173,8 @@ export class SongsService {
         capo !== undefined, // $7: whether to update capo
         capo || null,       // $8: the new capo value
         links ? JSON.stringify(links) : null,
+        tablature !== undefined, // $10: whether to update tablature
+        tablature ? JSON.stringify(tablature) : null, // $11: the new tablature value
         id,
       ]
     );

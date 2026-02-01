@@ -56,4 +56,8 @@ export class CreateSongDto {
   @IsArray()
   @IsString({ each: true })
   links?: string[];
+
+  @IsOptional()
+  @IsObject()
+  tablature?: any; // Complex JSONB structure for guitar tablature
 }
