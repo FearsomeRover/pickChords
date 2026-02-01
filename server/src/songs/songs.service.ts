@@ -245,4 +245,110 @@ export class SongsService {
       throw error;
     }
   }
+
+  // Tablature measure management
+  async addMeasure(id: number, measure: any, position?: number): Promise<Song> {
+    const dbSong = await this.prisma.song.findUnique({
+      where: { id },
+    });
+
+    if (!dbSong) {
+      throw new NotFoundException('Song not found');
+    }
+
+    const tablature = (dbSong.tablature as any) || { measures: [] };
+    const measures = tablature.measures || [];
+
+    // Add measure number if not provided
+    if (!measure.number) {
+      measure.number = measures.length + 1;
+    }
+
+    // Insert at position or append
+    if (position !== undefined && position >= 0 && position <= measures.length) {
+      measures.splice(position, 0, measure);
+      // Renumber measures after insertion
+      for (let i = position; i < measures.length; i++) {
+        measures[i].number = i + 1;
+      }
+    } else {
+      measures.push(measure);
+    }
+
+    const updatedSong = await this.prisma.song.update({
+      where: { id },
+      data: {
+        tablature: { ...tablature, measures } as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return this.toSong(updatedSong);
+  }
+
+  async removeMeasure(id: number, measureIndex: number): Promise<Song> {
+    const dbSong = await this.prisma.song.findUnique({
+      where: { id },
+    });
+
+    if (!dbSong) {
+      throw new NotFoundException('Song not found');
+    }
+
+    const tablature = (dbSong.tablature as any) || { measures: [] };
+    const measures = tablature.measures || [];
+
+    if (measureIndex < 0 || measureIndex >= measures.length) {
+      throw new NotFoundException('Measure not found');
+    }
+
+    // Remove measure
+    measures.splice(measureIndex, 1);
+
+    // Renumber remaining measures
+    for (let i = 0; i < measures.length; i++) {
+      measures[i].number = i + 1;
+    }
+
+    // If no measures left, set tablature to null
+    const newTablature = measures.length > 0
+      ? ({ ...tablature, measures } as unknown as Prisma.InputJsonValue)
+      : Prisma.JsonNull;
+
+    const updatedSong = await this.prisma.song.update({
+      where: { id },
+      data: { tablature: newTablature },
+    });
+
+    return this.toSong(updatedSong);
+  }
+
+  async updateMeasure(id: number, measureIndex: number, measure: any): Promise<Song> {
+    const dbSong = await this.prisma.song.findUnique({
+      where: { id },
+    });
+
+    if (!dbSong) {
+      throw new NotFoundException('Song not found');
+    }
+
+    const tablature = (dbSong.tablature as any) || { measures: [] };
+    const measures = tablature.measures || [];
+
+    if (measureIndex < 0 || measureIndex >= measures.length) {
+      throw new NotFoundException('Measure not found');
+    }
+
+    // Preserve measure number
+    measure.number = measureIndex + 1;
+    measures[measureIndex] = measure;
+
+    const updatedSong = await this.prisma.song.update({
+      where: { id },
+      data: {
+        tablature: { ...tablature, measures } as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return this.toSong(updatedSong);
+  }
 }
