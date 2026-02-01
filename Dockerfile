@@ -14,9 +14,10 @@ FROM node:20-alpine AS backend-build
 WORKDIR /app/server
 COPY server/package*.json ./
 RUN npm ci
-COPY server/tsconfig.json server/nest-cli.json ./
+COPY server/tsconfig.json server/nest-cli.json server/prisma.config.ts ./
+COPY server/prisma ./prisma
 COPY server/src ./src
-RUN npm run build
+RUN npx prisma generate && npm run build
 
 # Stage 3: Production image
 FROM node:20-alpine AS production
@@ -24,8 +25,9 @@ WORKDIR /app
 
 # Copy backend build and production dependencies
 COPY server/package*.json ./server/
+COPY server/prisma ./server/prisma
 WORKDIR /app/server
-RUN npm ci --only=production
+RUN npm ci --only=production && npx prisma generate
 
 # Copy built backend
 COPY --from=backend-build /app/server/dist ./dist
