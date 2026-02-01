@@ -1,4 +1,5 @@
 import { useState, ReactNode } from "react";
+import { X } from "lucide-react";
 import { Chord, StringData } from "../types";
 
 interface MenuItem {
@@ -426,15 +427,12 @@ export default function ChordDiagram({
                   border: 'none',
                   borderRadius: '50%',
                   cursor: 'pointer',
-                  fontSize: 12,
-                  fontWeight: 'bold',
                   padding: 0,
-                  lineHeight: 1,
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#00162D')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 22, 45, 0.5)')}
               >
-                ×
+                <X size={12} strokeWidth={3} />
               </button>
             )}
           </div>

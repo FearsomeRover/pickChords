@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import * as alphaTab from '@coderline/alphatab'
-import { SongTablature } from '../types'
-import { tablatureToAlphaTex } from '../utils/alphaTexConverter'
 
 interface TabViewerProps {
-  tablature: SongTablature
+  alphaTex: string | object | undefined // string expected, but handle legacy object format gracefully
   title?: string
   artist?: string
 }
 
-export default function TabViewer({ tablature, title, artist }: TabViewerProps) {
+export default function TabViewer({ alphaTex, title, artist }: TabViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const apiRef = useRef<alphaTab.AlphaTabApi | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -24,37 +22,15 @@ export default function TabViewer({ tablature, title, artist }: TabViewerProps) 
       apiRef.current = null
     }
 
-    // Validate tablature structure
-    console.log('TabViewer received tablature:', JSON.stringify(tablature, null, 2))
-
-    if (!tablature || typeof tablature !== 'object') {
-      console.log('TabViewer: tablature is null or not an object')
+    // Validate alphaTex - must be a non-empty string
+    if (!alphaTex || typeof alphaTex !== 'string') {
       setIsLoading(false)
-      setError('Invalid tablature data')
+      setError(typeof alphaTex === 'object' ? 'Tablature is in legacy format' : 'No tablature data')
       return
     }
 
-    // Check if we have any measures - handle both direct and nested structures
-    let measures = tablature.measures
-
-    // Sometimes the data might come as a string from the database
-    if (typeof tablature === 'string') {
-      try {
-        const parsed = JSON.parse(tablature)
-        measures = parsed.measures
-        console.log('TabViewer: parsed string tablature')
-      } catch (e) {
-        console.log('TabViewer: failed to parse string tablature')
-        setIsLoading(false)
-        setError('Invalid tablature format')
-        return
-      }
-    }
-
-    console.log('TabViewer measures:', measures)
-
-    if (!measures || !Array.isArray(measures) || measures.length === 0) {
-      console.log('TabViewer: no valid measures found')
+    const trimmedTex = alphaTex.trim()
+    if (!trimmedTex) {
       setIsLoading(false)
       setError('No tablature data')
       return
@@ -64,28 +40,31 @@ export default function TabViewer({ tablature, title, artist }: TabViewerProps) 
     setError(null)
 
     try {
-      // Ensure we have a proper tablature object with measures
-      const normalizedTablature: SongTablature = {
-        measures: measures,
-        tuning: tablature.tuning
+      // Build the final tex string with optional title/artist
+      let tex = alphaTex
+
+      // Add title/artist if provided and not already in the tex
+      if (title && !tex.includes('\\title')) {
+        tex = `\\title "${title}"\n${tex}`
+      }
+      if (artist && !tex.includes('\\artist')) {
+        tex = `\\artist "${artist}"\n${tex}`
       }
 
-      // Convert our data model to alphaTex
-      const tex = tablatureToAlphaTex(normalizedTablature, { title, artist })
-      console.log('Generated alphaTex:', tex)
+      console.log('Rendering alphaTex:', tex)
 
       // Initialize AlphaTab
       const settings = new alphaTab.Settings()
       settings.core.tex = true
       settings.core.engine = 'svg'
-      // Font directory - use base URL for fonts (alphaTab vite plugin handles this)
+      // Font directory - use base URL for fonts
       settings.core.fontDirectory = import.meta.env.BASE_URL + 'font/'
 
       // Display settings
       settings.display.scale = 1.0
       settings.display.stretchForce = 0.8
 
-      // Custom colors (using type assertion since fromJson can return null but won't with valid hex)
+      // Custom colors
       const staffLineColor = alphaTab.model.Color.fromJson('#B8BAB8')
       const mainGlyphColor = alphaTab.model.Color.fromJson('#00162D')
       const secondaryGlyphColor = alphaTab.model.Color.fromJson('#2D6A5C')
@@ -141,7 +120,7 @@ export default function TabViewer({ tablature, title, artist }: TabViewerProps) 
         apiRef.current = null
       }
     }
-  }, [tablature, title, artist])
+  }, [alphaTex, title, artist])
 
   if (error) {
     return (

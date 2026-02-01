@@ -185,7 +185,7 @@ export default function SongPage() {
           {/* Tablature Panel */}
           <div className="bg-off-white rounded-xl border-2 border-[#D4C9BC] p-6">
             <h4 className="text-lg font-semibold text-deep-navy mb-5">Tablature</h4>
-            <TabViewer tablature={song.tablature} />
+            <TabViewer alphaTex={song.tablature} />
           </div>
         </div>
       ) : (
@@ -213,7 +213,7 @@ export default function SongPage() {
           {song.tablature && (
             <div className={`bg-off-white rounded-xl border-2 border-[#D4C9BC] ${isMobile ? 'p-4' : 'p-6'}`}>
               <h4 className="text-lg font-semibold text-deep-navy mb-5">Tablature</h4>
-              <TabViewer tablature={song.tablature} />
+              <TabViewer alphaTex={song.tablature} />
             </div>
           )}
         </>

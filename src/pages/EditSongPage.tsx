@@ -20,7 +20,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Plus, X } from 'lucide-react'
-import { Chord, StrummingPattern, SongTablature } from '../types'
+import { Chord, StrummingPattern } from '../types'
 import { useAuth } from '../hooks/useAuth'
 import {
   useSong,
@@ -95,7 +95,7 @@ export default function EditSongPage() {
   const [capo, setCapo] = useState<number | undefined>(undefined)
   const [links, setLinks] = useState<string[]>([])
   const [newLink, setNewLink] = useState('')
-  const [tablature, setTablature] = useState<SongTablature | undefined>(undefined)
+  const [tablature, setTablature] = useState<string | undefined>(undefined)
   const [chordIds, setChordIds] = useState<number[]>([])
   const [chords, setChords] = useState<Chord[]>([])
   const [tagIds, setTagIds] = useState<number[]>([])
@@ -222,7 +222,7 @@ export default function EditSongPage() {
     setHasChanges(true)
   }
 
-  const handleTablatureChange = (newTablature: SongTablature | undefined) => {
+  const handleTablatureChange = (newTablature: string | undefined) => {
     setTablature(newTablature)
     if (!isInitialLoad.current) {
       setHasChanges(true)

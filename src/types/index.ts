@@ -20,36 +20,6 @@ export interface Tag {
 // Stroke types for strumming patterns
 export type StrokeType = 'down' | 'up' | 'mute_down' | 'mute_up' | 'accent_down' | 'accent_up' | 'rest' | 'skip';
 
-// Tablature types - simplified beat-based model
-export type TabTechnique = 'h' | 'p' | '/' | '\\' | '~' | 'b' | 'r'; // hammer-on, pull-off, slide up/down, vibrato, bend, release
-
-export interface TabNote {
-  string: number;             // 0-5 (0=high E, 5=low E)
-  fret: number;               // 0-24
-  technique?: TabTechnique;   // technique applied to this note
-}
-
-export interface TabBeat {
-  notes: TabNote[];           // notes played simultaneously at this beat
-  duration: number;           // 1=whole, 2=half, 4=quarter, 8=eighth, 16=sixteenth
-  chord?: string;             // chord name displayed above (e.g., "Em", "B7")
-  lyric?: string;             // lyric syllable displayed below
-}
-
-export interface TabMeasure {
-  beats: TabBeat[];           // beats in this measure
-  number?: number;            // measure number (for display)
-  timeSignature?: string;     // e.g., "4/4" (only if changes)
-  tempo?: number;             // BPM (only if changes)
-  section?: string;           // section name (e.g., "Verse 1", "Chorus")
-  instructions?: string[];    // e.g., ["let ring", "palm mute"]
-}
-
-export interface SongTablature {
-  measures: TabMeasure[];     // flat array of measures
-  tuning?: string[];          // e.g., ["E", "A", "D", "G", "B", "E"] (standard) or custom
-}
-
 export interface StrummingPattern {
   strokes: StrokeType[];
   tempo: number;
@@ -69,7 +39,7 @@ export interface Song {
   strumming_pattern?: StrummingPattern;
   capo?: number;
   links?: string[];
-  tablature?: SongTablature;
+  tablature?: string; // alphaTex format
   user_id?: number;
   created_at: string;
 }
