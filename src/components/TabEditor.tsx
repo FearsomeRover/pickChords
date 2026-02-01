@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Trash2, Eye, EyeOff } from 'lucide-react'
-import { Button } from './ui'
+import { Eye, EyeOff } from 'lucide-react'
 import TabViewer from './TabViewer'
 
 interface TabEditorProps {
