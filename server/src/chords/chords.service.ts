@@ -1,106 +1,125 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { CreateChordDto } from './dto/create-chord.dto';
-import { ChordDto } from './dto/chord.dto';
+import { ChordDto, StringData } from './dto/chord.dto';
 
 @Injectable()
 export class ChordsService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly prisma: PrismaService) {}
+
+  private toDto(chord: any): ChordDto {
+    return {
+      id: chord.id,
+      name: chord.name,
+      strings: chord.strings as StringData[],
+      start_fret: chord.startFret,
+      created_at: chord.createdAt.toISOString(),
+    };
+  }
 
   async findAll(search?: string): Promise<ChordDto[]> {
-    let query = 'SELECT * FROM chords ORDER BY usage_count DESC, name ASC';
-    let params: any[] = [];
+    const chords = await this.prisma.chord.findMany({
+      where: search
+        ? { name: { contains: search, mode: 'insensitive' } }
+        : undefined,
+      orderBy: [{ usageCount: 'desc' }, { name: 'asc' }],
+    });
 
-    if (search) {
-      query = 'SELECT * FROM chords WHERE LOWER(name) LIKE $1 ORDER BY usage_count DESC, name ASC';
-      params = [`%${search.toLowerCase()}%`];
-    }
-
-    const result = await this.db.query(query, params);
-    return result.rows;
+    return chords.map(this.toDto);
   }
 
   async findOne(id: number): Promise<ChordDto> {
-    const result = await this.db.query('SELECT * FROM chords WHERE id = $1', [id]);
+    const chord = await this.prisma.chord.findUnique({
+      where: { id },
+    });
 
-    if (result.rows.length === 0) {
+    if (!chord) {
       throw new NotFoundException('Chord not found');
     }
 
-    return result.rows[0];
+    return this.toDto(chord);
   }
 
   async findByIds(ids: number[]): Promise<ChordDto[]> {
     if (ids.length === 0) return [];
 
-    const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
-    const result = await this.db.query(
-      `SELECT * FROM chords WHERE id IN (${placeholders}) ORDER BY name`,
-      ids
-    );
-    return result.rows;
+    const chords = await this.prisma.chord.findMany({
+      where: { id: { in: ids } },
+      orderBy: { name: 'asc' },
+    });
+
+    return chords.map(this.toDto);
   }
 
   async create(createChordDto: CreateChordDto): Promise<ChordDto> {
     const { name, strings, start_fret = 1 } = createChordDto;
 
-    const result = await this.db.query(
-      'INSERT INTO chords (name, strings, start_fret) VALUES ($1, $2, $3) RETURNING *',
-      [name, JSON.stringify(strings), start_fret]
-    );
+    const chord = await this.prisma.chord.create({
+      data: {
+        name,
+        strings: strings as unknown as Prisma.InputJsonValue,
+        startFret: start_fret,
+      },
+    });
 
-    return result.rows[0];
+    return this.toDto(chord);
   }
 
   async update(id: number, updateChordDto: Partial<CreateChordDto>): Promise<ChordDto> {
     const { name, strings, start_fret } = updateChordDto;
 
-    const result = await this.db.query(
-      `UPDATE chords
-       SET name = COALESCE($1, name),
-           strings = COALESCE($2, strings),
-           start_fret = COALESCE($3, start_fret)
-       WHERE id = $4
-       RETURNING *`,
-      [name, strings ? JSON.stringify(strings) : null, start_fret, id]
-    );
+    try {
+      const chord = await this.prisma.chord.update({
+        where: { id },
+        data: {
+          ...(name !== undefined && { name }),
+          ...(strings !== undefined && { strings: strings as unknown as Prisma.InputJsonValue }),
+          ...(start_fret !== undefined && { startFret: start_fret }),
+        },
+      });
 
-    if (result.rows.length === 0) {
-      throw new NotFoundException('Chord not found');
+      return this.toDto(chord);
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        throw new NotFoundException('Chord not found');
+      }
+      throw error;
     }
-
-    return result.rows[0];
   }
 
   async delete(id: number): Promise<ChordDto> {
-    const result = await this.db.query('DELETE FROM chords WHERE id = $1 RETURNING *', [id]);
+    try {
+      const chord = await this.prisma.chord.delete({
+        where: { id },
+      });
 
-    if (result.rows.length === 0) {
-      throw new NotFoundException('Chord not found');
+      return this.toDto(chord);
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        throw new NotFoundException('Chord not found');
+      }
+      throw error;
     }
-
-    return result.rows[0];
   }
 
   async incrementUsageCount(chordIds: number[]): Promise<void> {
     if (chordIds.length === 0) return;
 
-    // Increment usage_count for each chord
-    const placeholders = chordIds.map((_, i) => `$${i + 1}`).join(',');
-    await this.db.query(
-      `UPDATE chords SET usage_count = usage_count + 1 WHERE id IN (${placeholders})`,
-      chordIds
-    );
+    await this.prisma.chord.updateMany({
+      where: { id: { in: chordIds } },
+      data: { usageCount: { increment: 1 } },
+    });
   }
 
   async decrementUsageCount(chordIds: number[]): Promise<void> {
     if (chordIds.length === 0) return;
 
-    // Decrement usage_count for each chord, but don't go below 0
-    const placeholders = chordIds.map((_, i) => `$${i + 1}`).join(',');
-    await this.db.query(
-      `UPDATE chords SET usage_count = GREATEST(usage_count - 1, 0) WHERE id IN (${placeholders})`,
-      chordIds
-    );
+    // Prisma doesn't support GREATEST in updateMany, so we use raw query
+    await this.prisma.$executeRaw`
+      UPDATE chords
+      SET usage_count = GREATEST(usage_count - 1, 0)
+      WHERE id = ANY(${chordIds}::int[])
+    `;
   }
 }

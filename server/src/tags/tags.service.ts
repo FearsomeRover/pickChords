@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateTagDto } from './dto/create-tag.dto';
 
 export interface Tag {
@@ -11,42 +11,55 @@ export interface Tag {
 
 @Injectable()
 export class TagsService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly prisma: PrismaService) {}
+
+  private toTag(dbTag: any): Tag {
+    return {
+      id: dbTag.id,
+      name: dbTag.name,
+      color: dbTag.color,
+      created_at: dbTag.createdAt.toISOString(),
+    };
+  }
 
   async findAll(): Promise<Tag[]> {
-    const result = await this.db.query('SELECT * FROM tags ORDER BY name');
-    return result.rows;
+    const tags = await this.prisma.tag.findMany({
+      orderBy: { name: 'asc' },
+    });
+    return tags.map(this.toTag);
   }
 
   async findByIds(ids: number[]): Promise<Tag[]> {
     if (ids.length === 0) return [];
 
-    const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
-    const result = await this.db.query(
-      `SELECT * FROM tags WHERE id IN (${placeholders}) ORDER BY name`,
-      ids
-    );
-    return result.rows;
+    const tags = await this.prisma.tag.findMany({
+      where: { id: { in: ids } },
+      orderBy: { name: 'asc' },
+    });
+    return tags.map(this.toTag);
   }
 
   async create(createTagDto: CreateTagDto): Promise<Tag> {
     const { name, color = '#5b8bd4' } = createTagDto;
 
-    const result = await this.db.query(
-      'INSERT INTO tags (name, color) VALUES ($1, $2) RETURNING *',
-      [name, color]
-    );
+    const tag = await this.prisma.tag.create({
+      data: { name, color },
+    });
 
-    return result.rows[0];
+    return this.toTag(tag);
   }
 
   async delete(id: number): Promise<Tag> {
-    const result = await this.db.query('DELETE FROM tags WHERE id = $1 RETURNING *', [id]);
-
-    if (result.rows.length === 0) {
-      throw new NotFoundException('Tag not found');
+    try {
+      const tag = await this.prisma.tag.delete({
+        where: { id },
+      });
+      return this.toTag(tag);
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        throw new NotFoundException('Tag not found');
+      }
+      throw error;
     }
-
-    return result.rows[0];
   }
 }

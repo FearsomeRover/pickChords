@@ -20,36 +20,34 @@ export interface Tag {
 // Stroke types for strumming patterns
 export type StrokeType = 'down' | 'up' | 'mute_down' | 'mute_up' | 'accent_down' | 'accent_up' | 'rest' | 'skip';
 
-// Tablature types
+// Tablature types - simplified beat-based model
 export type TabTechnique = 'h' | 'p' | '/' | '\\' | '~' | 'b' | 'r'; // hammer-on, pull-off, slide up/down, vibrato, bend, release
 
 export interface TabNote {
-  fret: number | null;        // null = no note, 0-24 = fret number
+  string: number;             // 0-5 (0=high E, 5=low E)
+  fret: number;               // 0-24
   technique?: TabTechnique;   // technique applied to this note
 }
 
-export interface TabString {
-  notes: (TabNote | null)[];  // array of notes for this string in a measure
+export interface TabBeat {
+  notes: TabNote[];           // notes played simultaneously at this beat
+  duration: number;           // 1=whole, 2=half, 4=quarter, 8=eighth, 16=sixteenth
+  chord?: string;             // chord name displayed above (e.g., "Em", "B7")
+  lyric?: string;             // lyric syllable displayed below
 }
 
 export interface TabMeasure {
-  chordName?: string;         // chord name displayed above measure (e.g., "Fmaj7", "G6")
-  strings: TabString[];       // 6 strings (index 0 = high E, index 5 = low E)
-  timingMarkers?: string[];   // e.g., ["1", "e", "+", "a", "2", "e", "+", "a", ...]
-}
-
-export interface TabSection {
-  name: string;               // section name (e.g., "Verse 1", "Chorus", "Intro")
-  tempo?: number;             // BPM
-  timeSignature?: string;     // e.g., "4/4", "3/4"
+  beats: TabBeat[];           // beats in this measure
+  number?: number;            // measure number (for display)
+  timeSignature?: string;     // e.g., "4/4" (only if changes)
+  tempo?: number;             // BPM (only if changes)
+  section?: string;           // section name (e.g., "Verse 1", "Chorus")
   instructions?: string[];    // e.g., ["let ring", "palm mute"]
-  measures: TabMeasure[];
 }
 
 export interface SongTablature {
-  sections: TabSection[];
+  measures: TabMeasure[];     // flat array of measures
   tuning?: string[];          // e.g., ["E", "A", "D", "G", "B", "E"] (standard) or custom
-  rawText?: string;           // optional raw ASCII tab text for simple storage/display
 }
 
 export interface StrummingPattern {

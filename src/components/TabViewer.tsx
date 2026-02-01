@@ -1,154 +1,131 @@
-import { SongTablature, TabSection } from '../types'
+import { useEffect, useRef, useState } from 'react'
+import * as alphaTab from '@coderline/alphatab'
+import { SongTablature } from '../types'
+import { tablatureToAlphaTex } from '../utils/alphaTexConverter'
 
 interface TabViewerProps {
   tablature: SongTablature
-  highlightChord?: string  // chord name to highlight
+  title?: string
+  artist?: string
 }
 
-// String names for standard tuning (high E to low E)
-const STRING_NAMES = ['e', 'B', 'G', 'D', 'A', 'E']
+export default function TabViewer({ tablature, title, artist }: TabViewerProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const apiRef = useRef<alphaTab.AlphaTabApi | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-// Technique symbols
-const TECHNIQUE_SYMBOLS: Record<string, string> = {
-  'h': 'h',  // hammer-on
-  'p': 'p',  // pull-off
-  '/': '/',  // slide up
-  '\\': '\\', // slide down
-  '~': '~',  // vibrato
-  'b': 'b',  // bend
-  'r': 'r',  // release
-}
+  useEffect(() => {
+    if (!containerRef.current) return
 
-function TabSectionDisplay({ section, highlightChord }: { section: TabSection; highlightChord?: string }) {
-  return (
-    <div className="mb-6">
-      {/* Section header */}
-      <div className="flex items-center gap-4 mb-2">
-        <h3 className="text-lg font-semibold text-deep-navy">{section.name}</h3>
-        {section.tempo && (
-          <span className="text-sm text-light-gray">♩ = {section.tempo}</span>
-        )}
-        {section.timeSignature && (
-          <span className="text-sm text-light-gray">{section.timeSignature}</span>
-        )}
-      </div>
+    // Clean up previous instance
+    if (apiRef.current) {
+      apiRef.current.destroy()
+      apiRef.current = null
+    }
 
-      {/* Instructions */}
-      {section.instructions && section.instructions.length > 0 && (
-        <div className="text-sm text-light-gray italic mb-2">
-          {section.instructions.join(' • ')}
-        </div>
-      )}
+    // Check if we have any measures
+    if (!tablature.measures || tablature.measures.length === 0) {
+      setIsLoading(false)
+      setError('No tablature data')
+      return
+    }
 
-      {/* Measures */}
-      <div className="font-mono text-sm bg-cream rounded-lg p-4 overflow-x-auto">
-        {section.measures.map((measure, measureIdx) => (
-          <div key={measureIdx} className="inline-block mr-4 mb-4">
-            {/* Chord name */}
-            {measure.chordName && (
-              <div className={`text-sm font-semibold mb-1 ${
-                highlightChord === measure.chordName
-                  ? 'text-teal-green'
-                  : 'text-deep-navy'
-              }`}>
-                {measure.chordName}
-              </div>
-            )}
+    setIsLoading(true)
+    setError(null)
 
-            {/* Tab lines */}
-            <div className="text-deep-navy">
-              {STRING_NAMES.map((stringName, stringIdx) => {
-                const stringData = measure.strings[stringIdx]
-                let content = ''
+    try {
+      // Convert our data model to alphaTex
+      const tex = tablatureToAlphaTex(tablature, { title, artist })
+      console.log('Generated alphaTex:', tex)
 
-                if (stringData && stringData.notes) {
-                  for (const note of stringData.notes) {
-                    if (note === null || note.fret === null) {
-                      content += '-'
-                    } else {
-                      const fretStr = note.fret.toString()
-                      content += fretStr
-                      if (note.technique) {
-                        content += TECHNIQUE_SYMBOLS[note.technique] || ''
-                      }
-                    }
-                  }
-                } else {
-                  content = '--------'
-                }
+      // Initialize AlphaTab
+      const settings = new alphaTab.Settings()
+      settings.core.tex = true
+      settings.core.engine = 'svg'
 
-                return (
-                  <div key={stringIdx} className="flex">
-                    <span className="w-4 text-light-gray">{stringName}</span>
-                    <span className="text-light-gray">|</span>
-                    <span>{content}</span>
-                    <span className="text-light-gray">|</span>
-                  </div>
-                )
-              })}
-            </div>
+      // Display settings
+      settings.display.scale = 1.0
+      settings.display.stretchForce = 0.8
 
-            {/* Timing markers */}
-            {measure.timingMarkers && measure.timingMarkers.length > 0 && (
-              <div className="text-xs text-light-gray mt-1 ml-5">
-                {measure.timingMarkers.join(' ')}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
+      // Custom colors (using type assertion since fromJson can return null but won't with valid hex)
+      const staffLineColor = alphaTab.model.Color.fromJson('#B8BAB8')
+      const mainGlyphColor = alphaTab.model.Color.fromJson('#00162D')
+      const secondaryGlyphColor = alphaTab.model.Color.fromJson('#2D6A5C')
+      const barSeparatorColor = alphaTab.model.Color.fromJson('#B8BAB8')
 
-// Simple raw text display for ASCII tabs
-function RawTabDisplay({ rawText }: { rawText: string }) {
-  return (
-    <div className="font-mono text-sm bg-cream rounded-lg p-4 overflow-x-auto whitespace-pre">
-      {rawText}
-    </div>
-  )
-}
+      if (staffLineColor) settings.display.resources.staffLineColor = staffLineColor
+      if (mainGlyphColor) settings.display.resources.mainGlyphColor = mainGlyphColor
+      if (secondaryGlyphColor) settings.display.resources.secondaryGlyphColor = secondaryGlyphColor
+      if (barSeparatorColor) settings.display.resources.barSeparatorColor = barSeparatorColor
 
-export default function TabViewer({ tablature, highlightChord }: TabViewerProps) {
-  // If we have raw text, display it directly
-  if (tablature.rawText) {
+      // Notation settings - show only tabs, not standard notation
+      settings.notation.elements.set(alphaTab.NotationElement.ScoreTitle, false)
+      settings.notation.elements.set(alphaTab.NotationElement.ScoreSubTitle, false)
+      settings.notation.elements.set(alphaTab.NotationElement.ScoreArtist, false)
+      settings.notation.elements.set(alphaTab.NotationElement.ScoreAlbum, false)
+      settings.notation.elements.set(alphaTab.NotationElement.ScoreWords, false)
+      settings.notation.elements.set(alphaTab.NotationElement.ScoreMusic, false)
+      settings.notation.elements.set(alphaTab.NotationElement.ScoreCopyright, false)
+      settings.notation.elements.set(alphaTab.NotationElement.GuitarTuning, true)
+
+      // Create API
+      const api = new alphaTab.AlphaTabApi(containerRef.current, settings)
+      apiRef.current = api
+
+      // Event handlers
+      api.renderStarted.on(() => {
+        setIsLoading(true)
+      })
+
+      api.renderFinished.on(() => {
+        setIsLoading(false)
+      })
+
+      api.error.on((e) => {
+        console.error('AlphaTab error:', e)
+        setError(e.message || 'Failed to render tablature')
+        setIsLoading(false)
+      })
+
+      // Load the tex
+      api.tex(tex)
+
+    } catch (e) {
+      console.error('AlphaTab initialization error:', e)
+      setError(e instanceof Error ? e.message : 'Failed to initialize tablature viewer')
+      setIsLoading(false)
+    }
+
+    // Cleanup
+    return () => {
+      if (apiRef.current) {
+        apiRef.current.destroy()
+        apiRef.current = null
+      }
+    }
+  }, [tablature, title, artist])
+
+  if (error) {
     return (
-      <div>
-        {tablature.tuning && (
-          <div className="text-sm text-light-gray mb-2">
-            Tuning: {tablature.tuning.join(' ')}
-          </div>
-        )}
-        <RawTabDisplay rawText={tablature.rawText} />
-      </div>
-    )
-  }
-
-  // Otherwise, render structured sections
-  if (!tablature.sections || tablature.sections.length === 0) {
-    return (
-      <div className="text-light-gray text-center py-4">
-        No tablature data available
+      <div className="bg-cream rounded-lg p-4 text-center text-light-gray">
+        {error}
       </div>
     )
   }
 
   return (
-    <div>
-      {tablature.tuning && tablature.tuning.join('') !== 'EADGBE' && (
-        <div className="text-sm text-light-gray mb-4">
-          Tuning: {tablature.tuning.join(' ')}
+    <div className="relative">
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-off-white/80 z-10">
+          <div className="text-light-gray">Loading tablature...</div>
         </div>
       )}
-
-      {tablature.sections.map((section, idx) => (
-        <TabSectionDisplay
-          key={idx}
-          section={section}
-          highlightChord={highlightChord}
-        />
-      ))}
+      <div
+        ref={containerRef}
+        className="alphatab-container bg-off-white rounded-lg overflow-x-auto"
+        style={{ minHeight: '200px' }}
+      />
     </div>
   )
 }

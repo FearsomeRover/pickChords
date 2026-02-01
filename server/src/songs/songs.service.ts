@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { ChordsService } from '../chords/chords.service';
 import { TagsService } from '../tags/tags.service';
 import { CreateSongDto } from './dto/create-song.dto';
@@ -34,37 +35,58 @@ export interface SongWithExpanded extends Song {
 @Injectable()
 export class SongsService {
   constructor(
-    private readonly db: DatabaseService,
+    private readonly prisma: PrismaService,
     private readonly chordsService: ChordsService,
     private readonly tagsService: TagsService,
   ) {}
+
+  private toSong(dbSong: any): Song {
+    return {
+      id: dbSong.id,
+      name: dbSong.name,
+      artist: dbSong.artist || undefined,
+      notes: dbSong.notes || undefined,
+      chord_ids: (dbSong.chordIds as number[]) || [],
+      tag_ids: (dbSong.tagIds as number[]) || [],
+      strumming_pattern: dbSong.strummingPattern as StrummingPattern | undefined,
+      capo: dbSong.capo || undefined,
+      links: (dbSong.links as string[]) || [],
+      tablature: dbSong.tablature || undefined,
+      user_id: dbSong.userId || undefined,
+      created_at: dbSong.createdAt.toISOString(),
+    };
+  }
 
   async findAll(options: {
     search?: string;
     tagId?: number;
   }): Promise<SongWithExpanded[]> {
-    let query = 'SELECT s.* FROM songs s';
-    const params: any[] = [];
-    const conditions: string[] = [];
+    // Build where clause
+    const where: any = {};
 
     if (options.search) {
-      params.push(`%${options.search.toLowerCase()}%`);
-      conditions.push(`(LOWER(s.name) LIKE $${params.length} OR LOWER(s.artist) LIKE $${params.length})`);
+      where.OR = [
+        { name: { contains: options.search, mode: 'insensitive' } },
+        { artist: { contains: options.search, mode: 'insensitive' } },
+      ];
     }
 
     if (options.tagId) {
-      params.push(options.tagId);
-      conditions.push(`s.tag_ids @> $${params.length}::jsonb`);
+      // Use raw query for JSONB array contains
+      where.tagIds = { array_contains: options.tagId };
     }
 
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ');
-    }
+    const dbSongs = await this.prisma.song.findMany({
+      where: options.tagId
+        ? {
+            ...where,
+            tagIds: { array_contains: options.tagId },
+          }
+        : where,
+      orderBy: { name: 'asc' },
+    });
 
-    query += ' ORDER BY s.name';
-
-    const result = await this.db.query(query, params);
-    const songs: SongWithExpanded[] = result.rows;
+    const songs: SongWithExpanded[] = dbSongs.map(s => this.toSong(s));
 
     // Batch load all chords and tags to avoid N+1 queries
     const allChordIds = [...new Set(songs.flatMap(s => s.chord_ids || []))];
@@ -89,13 +111,15 @@ export class SongsService {
   }
 
   async findOne(id: number): Promise<SongWithExpanded> {
-    const result = await this.db.query('SELECT * FROM songs WHERE id = $1', [id]);
+    const dbSong = await this.prisma.song.findUnique({
+      where: { id },
+    });
 
-    if (result.rows.length === 0) {
+    if (!dbSong) {
       throw new NotFoundException('Song not found');
     }
 
-    const song: SongWithExpanded = result.rows[0];
+    const song: SongWithExpanded = this.toSong(dbSong);
 
     // Expand chords and tags
     song.chords = await this.chordsService.findByIds(song.chord_ids || []);
@@ -105,37 +129,36 @@ export class SongsService {
   }
 
   async findOneRaw(id: number): Promise<Song | null> {
-    const result = await this.db.query('SELECT * FROM songs WHERE id = $1', [id]);
-    return result.rows[0] || null;
+    const dbSong = await this.prisma.song.findUnique({
+      where: { id },
+    });
+    return dbSong ? this.toSong(dbSong) : null;
   }
 
   async create(createSongDto: CreateSongDto, userId: number): Promise<Song> {
     const { name, artist, notes, chord_ids = [], tag_ids = [], strumming_pattern, capo, links = [], tablature } = createSongDto;
 
-    const result = await this.db.query(
-      `INSERT INTO songs (name, artist, notes, chord_ids, tag_ids, strumming_pattern, capo, links, tablature, user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       RETURNING *`,
-      [
+    const dbSong = await this.prisma.song.create({
+      data: {
         name,
-        artist || null,
-        notes || null,
-        JSON.stringify(chord_ids),
-        JSON.stringify(tag_ids),
-        strumming_pattern ? JSON.stringify(strumming_pattern) : null,
-        capo || null,
-        JSON.stringify(links),
-        tablature ? JSON.stringify(tablature) : null,
-        userId
-      ]
-    );
+        artist: artist || null,
+        notes: notes || null,
+        chordIds: chord_ids,
+        tagIds: tag_ids,
+        strummingPattern: strumming_pattern ? (strumming_pattern as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
+        capo: capo || null,
+        links: links,
+        tablature: tablature ? (tablature as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
+        userId,
+      },
+    });
 
     // Increment usage count for all chords in this song
     if (chord_ids.length > 0) {
       await this.chordsService.incrementUsageCount(chord_ids);
     }
 
-    return result.rows[0];
+    return this.toSong(dbSong);
   }
 
   async update(id: number, updateSongDto: Partial<CreateSongDto>): Promise<Song> {
@@ -144,76 +167,82 @@ export class SongsService {
     // Get the old chord_ids if we're updating chords
     let oldChordIds: number[] = [];
     if (chord_ids !== undefined) {
-      const oldSong = await this.db.query('SELECT chord_ids FROM songs WHERE id = $1', [id]);
-      if (oldSong.rows.length > 0) {
-        oldChordIds = oldSong.rows[0].chord_ids || [];
+      const oldSong = await this.prisma.song.findUnique({
+        where: { id },
+        select: { chordIds: true },
+      });
+      if (oldSong) {
+        oldChordIds = (oldSong.chordIds as number[]) || [];
       }
     }
 
-    const result = await this.db.query(
-      `UPDATE songs
-       SET name = COALESCE($1, name),
-           artist = COALESCE($2, artist),
-           notes = COALESCE($3, notes),
-           chord_ids = COALESCE($4, chord_ids),
-           tag_ids = COALESCE($5, tag_ids),
-           strumming_pattern = COALESCE($6, strumming_pattern),
-           capo = CASE WHEN $7::boolean THEN $8 ELSE capo END,
-           links = COALESCE($9, links),
-           tablature = CASE WHEN $10::boolean THEN $11 ELSE tablature END
-       WHERE id = $12
-       RETURNING *`,
-      [
-        name,
-        artist,
-        notes,
-        chord_ids ? JSON.stringify(chord_ids) : null,
-        tag_ids ? JSON.stringify(tag_ids) : null,
-        strumming_pattern !== undefined ? JSON.stringify(strumming_pattern) : null,
-        capo !== undefined, // $7: whether to update capo
-        capo || null,       // $8: the new capo value
-        links ? JSON.stringify(links) : null,
-        tablature !== undefined, // $10: whether to update tablature
-        tablature ? JSON.stringify(tablature) : null, // $11: the new tablature value
-        id,
-      ]
-    );
+    try {
+      const dbSong = await this.prisma.song.update({
+        where: { id },
+        data: {
+          ...(name !== undefined && { name }),
+          ...(artist !== undefined && { artist: artist || null }),
+          ...(notes !== undefined && { notes: notes || null }),
+          ...(chord_ids !== undefined && { chordIds: chord_ids }),
+          ...(tag_ids !== undefined && { tagIds: tag_ids }),
+          ...(strumming_pattern !== undefined && {
+            strummingPattern: strumming_pattern
+              ? (strumming_pattern as unknown as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
+          }),
+          ...(capo !== undefined && { capo: capo || null }),
+          ...(links !== undefined && { links }),
+          ...(tablature !== undefined && {
+            tablature: tablature
+              ? (tablature as unknown as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
+          }),
+        },
+      });
 
-    if (result.rows.length === 0) {
-      throw new NotFoundException('Song not found');
-    }
+      // Update usage counts if chords changed
+      if (chord_ids !== undefined) {
+        // Find chords that were removed
+        const removedChords = oldChordIds.filter(cid => !chord_ids.includes(cid));
+        if (removedChords.length > 0) {
+          await this.chordsService.decrementUsageCount(removedChords);
+        }
 
-    // Update usage counts if chords changed
-    if (chord_ids !== undefined) {
-      // Find chords that were removed
-      const removedChords = oldChordIds.filter(id => !chord_ids.includes(id));
-      if (removedChords.length > 0) {
-        await this.chordsService.decrementUsageCount(removedChords);
+        // Find chords that were added
+        const addedChords = chord_ids.filter(cid => !oldChordIds.includes(cid));
+        if (addedChords.length > 0) {
+          await this.chordsService.incrementUsageCount(addedChords);
+        }
       }
 
-      // Find chords that were added
-      const addedChords = chord_ids.filter(id => !oldChordIds.includes(id));
-      if (addedChords.length > 0) {
-        await this.chordsService.incrementUsageCount(addedChords);
+      return this.toSong(dbSong);
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        throw new NotFoundException('Song not found');
       }
+      throw error;
     }
-
-    return result.rows[0];
   }
 
   async delete(id: number): Promise<Song> {
-    const result = await this.db.query('DELETE FROM songs WHERE id = $1 RETURNING *', [id]);
+    try {
+      const dbSong = await this.prisma.song.delete({
+        where: { id },
+      });
 
-    if (result.rows.length === 0) {
-      throw new NotFoundException('Song not found');
+      const deletedSong = this.toSong(dbSong);
+
+      // Decrement usage count for all chords in this song
+      if (deletedSong.chord_ids && deletedSong.chord_ids.length > 0) {
+        await this.chordsService.decrementUsageCount(deletedSong.chord_ids);
+      }
+
+      return deletedSong;
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        throw new NotFoundException('Song not found');
+      }
+      throw error;
     }
-
-    // Decrement usage count for all chords in this song
-    const deletedSong = result.rows[0];
-    if (deletedSong.chord_ids && deletedSong.chord_ids.length > 0) {
-      await this.chordsService.decrementUsageCount(deletedSong.chord_ids);
-    }
-
-    return result.rows[0];
   }
 }

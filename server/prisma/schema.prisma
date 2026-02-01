@@ -1,0 +1,101 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           Int            @id @default(autoincrement())
+  username     String         @unique @db.VarChar(100)
+  passwordHash String         @map("password_hash") @db.VarChar(255)
+  isAdmin      Boolean        @default(false) @map("is_admin")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  songs        Song[]
+  logs         Log[]
+  progress     SongProgress[]
+
+  @@map("users")
+}
+
+model Chord {
+  id         Int      @id @default(autoincrement())
+  name       String   @db.VarChar(100)
+  strings    Json
+  startFret  Int      @default(1) @map("start_fret")
+  usageCount Int      @default(0) @map("usage_count")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("chords")
+}
+
+model Tag {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique @db.VarChar(100)
+  color     String   @default("#5b8bd4") @db.VarChar(7)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("tags")
+}
+
+model Song {
+  id               Int            @id @default(autoincrement())
+  name             String         @db.VarChar(255)
+  artist           String?        @db.VarChar(255)
+  notes            String?
+  chordIds         Json           @default("[]") @map("chord_ids")
+  tagIds           Json           @default("[]") @map("tag_ids")
+  strummingPattern Json?          @map("strumming_pattern")
+  capo             Int?
+  links            Json           @default("[]")
+  tablature        Json?
+  userId           Int?           @map("user_id")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  user             User?          @relation(fields: [userId], references: [id])
+  progress         SongProgress[]
+
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+  @@map("songs")
+}
+
+model Log {
+  id        Int      @id @default(autoincrement())
+  level     String   @db.VarChar(20)
+  action    String   @db.VarChar(100)
+  message   String
+  userId    Int?     @map("user_id")
+  username  String?  @db.VarChar(100)
+  ipAddress String?  @map("ip_address") @db.VarChar(45)
+  userAgent String?  @map("user_agent")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([createdAt(sort: Desc)])
+  @@index([level])
+  @@index([action])
+  @@map("logs")
+}
+
+model SongProgress {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  songId    Int      @map("song_id")
+  status    String   @default("want_to_learn") @db.VarChar(50)
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  song      Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, songId])
+  @@index([userId])
+  @@index([status])
+  @@index([songId])
+  @@map("song_progress")
+}

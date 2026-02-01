@@ -74,6 +74,20 @@ body {
   }
 }
 
+/* AlphaTab container styles */
+.alphatab-container {
+  padding: 1rem;
+}
+
+.alphatab-container .at-surface {
+  width: 100% !important;
+}
+
+.alphatab-container .at-surface svg {
+  max-width: 100%;
+  height: auto;
+}
+
 /* Touch-friendly active states for devices without hover */
 @media (hover: none) and (pointer: coarse) {
   /* Active feedback for buttons */

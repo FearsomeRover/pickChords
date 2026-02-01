@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 export type ProgressStatus = 'want_to_learn' | 'learning' | 'practicing' | 'mastered';
 
@@ -19,37 +19,40 @@ export interface SongProgress {
 
 @Injectable()
 export class ProgressService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly prisma: PrismaService) {}
+
+  private toSongProgress(dbProgress: any): SongProgress {
+    return {
+      id: dbProgress.id,
+      user_id: dbProgress.userId,
+      song_id: dbProgress.songId,
+      status: dbProgress.status as ProgressStatus,
+      position: dbProgress.position,
+      created_at: dbProgress.createdAt.toISOString(),
+      updated_at: dbProgress.updatedAt.toISOString(),
+      song_name: dbProgress.song?.name,
+      song_artist: dbProgress.song?.artist,
+      chord_count: dbProgress.song?.chordIds ? (dbProgress.song.chordIds as any[]).length : 0,
+    };
+  }
 
   async findAllByUser(userId: number): Promise<SongProgress[]> {
-    const result = await this.db.query(
-      `SELECT
-        sp.*,
-        s.name as song_name,
-        s.artist as song_artist,
-        jsonb_array_length(s.chord_ids) as chord_count
-       FROM song_progress sp
-       JOIN songs s ON sp.song_id = s.id
-       WHERE sp.user_id = $1
-       ORDER BY sp.status, sp.position`,
-      [userId],
-    );
-    return result.rows;
+    const progressList = await this.prisma.songProgress.findMany({
+      where: { userId },
+      include: { song: true },
+      orderBy: [{ status: 'asc' }, { position: 'asc' }],
+    });
+    return progressList.map(this.toSongProgress);
   }
 
   async findOne(userId: number, songId: number): Promise<SongProgress | null> {
-    const result = await this.db.query(
-      `SELECT
-        sp.*,
-        s.name as song_name,
-        s.artist as song_artist,
-        jsonb_array_length(s.chord_ids) as chord_count
-       FROM song_progress sp
-       JOIN songs s ON sp.song_id = s.id
-       WHERE sp.user_id = $1 AND sp.song_id = $2`,
-      [userId, songId],
-    );
-    return result.rows[0] || null;
+    const progress = await this.prisma.songProgress.findUnique({
+      where: {
+        userId_songId: { userId, songId },
+      },
+      include: { song: true },
+    });
+    return progress ? this.toSongProgress(progress) : null;
   }
 
   async addToProgress(
@@ -58,24 +61,28 @@ export class ProgressService {
     status: ProgressStatus = 'want_to_learn',
   ): Promise<SongProgress> {
     // Get the max position for this status
-    const posResult = await this.db.query(
-      `SELECT COALESCE(MAX(position), -1) + 1 as next_pos
-       FROM song_progress
-       WHERE user_id = $1 AND status = $2`,
-      [userId, status],
-    );
-    const position = posResult.rows[0].next_pos;
+    const maxPositionResult = await this.prisma.songProgress.aggregate({
+      where: { userId, status },
+      _max: { position: true },
+    });
+    const position = (maxPositionResult._max.position ?? -1) + 1;
 
-    const result = await this.db.query(
-      `INSERT INTO song_progress (user_id, song_id, status, position)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (user_id, song_id) DO UPDATE SET
-         status = EXCLUDED.status,
-         position = EXCLUDED.position,
-         updated_at = CURRENT_TIMESTAMP
-       RETURNING *`,
-      [userId, songId, status, position],
-    );
+    await this.prisma.songProgress.upsert({
+      where: {
+        userId_songId: { userId, songId },
+      },
+      create: {
+        userId,
+        songId,
+        status,
+        position,
+      },
+      update: {
+        status,
+        position,
+        updatedAt: new Date(),
+      },
+    });
 
     return this.findOne(userId, songId) as Promise<SongProgress>;
   }
@@ -98,48 +105,60 @@ export class ProgressService {
     // If status changed, we need to reorder both columns
     if (oldStatus !== status) {
       // Remove from old column (shift positions down)
-      await this.db.query(
-        `UPDATE song_progress
-         SET position = position - 1
-         WHERE user_id = $1 AND status = $2 AND position > $3`,
-        [userId, oldStatus, oldPosition],
-      );
+      await this.prisma.songProgress.updateMany({
+        where: {
+          userId,
+          status: oldStatus,
+          position: { gt: oldPosition },
+        },
+        data: { position: { decrement: 1 } },
+      });
 
       // Make room in new column (shift positions up)
-      await this.db.query(
-        `UPDATE song_progress
-         SET position = position + 1
-         WHERE user_id = $1 AND status = $2 AND position >= $3`,
-        [userId, status, position],
-      );
+      await this.prisma.songProgress.updateMany({
+        where: {
+          userId,
+          status,
+          position: { gte: position },
+        },
+        data: { position: { increment: 1 } },
+      });
     } else {
       // Same column, just reorder
       if (oldPosition < position) {
         // Moving down: shift items between old and new position up
-        await this.db.query(
-          `UPDATE song_progress
-           SET position = position - 1
-           WHERE user_id = $1 AND status = $2 AND position > $3 AND position <= $4`,
-          [userId, status, oldPosition, position],
-        );
+        await this.prisma.songProgress.updateMany({
+          where: {
+            userId,
+            status,
+            position: { gt: oldPosition, lte: position },
+          },
+          data: { position: { decrement: 1 } },
+        });
       } else if (oldPosition > position) {
         // Moving up: shift items between new and old position down
-        await this.db.query(
-          `UPDATE song_progress
-           SET position = position + 1
-           WHERE user_id = $1 AND status = $2 AND position >= $3 AND position < $4`,
-          [userId, status, position, oldPosition],
-        );
+        await this.prisma.songProgress.updateMany({
+          where: {
+            userId,
+            status,
+            position: { gte: position, lt: oldPosition },
+          },
+          data: { position: { increment: 1 } },
+        });
       }
     }
 
     // Update the item itself
-    await this.db.query(
-      `UPDATE song_progress
-       SET status = $1, position = $2, updated_at = CURRENT_TIMESTAMP
-       WHERE user_id = $3 AND song_id = $4`,
-      [status, position, userId, songId],
-    );
+    await this.prisma.songProgress.update({
+      where: {
+        userId_songId: { userId, songId },
+      },
+      data: {
+        status,
+        position,
+        updatedAt: new Date(),
+      },
+    });
 
     return this.findOne(userId, songId) as Promise<SongProgress>;
   }
@@ -151,17 +170,20 @@ export class ProgressService {
     }
 
     // Delete the entry
-    await this.db.query(
-      `DELETE FROM song_progress WHERE user_id = $1 AND song_id = $2`,
-      [userId, songId],
-    );
+    await this.prisma.songProgress.delete({
+      where: {
+        userId_songId: { userId, songId },
+      },
+    });
 
     // Shift positions down for remaining items in the same column
-    await this.db.query(
-      `UPDATE song_progress
-       SET position = position - 1
-       WHERE user_id = $1 AND status = $2 AND position > $3`,
-      [userId, existing.status, existing.position],
-    );
+    await this.prisma.songProgress.updateMany({
+      where: {
+        userId,
+        status: existing.status,
+        position: { gt: existing.position },
+      },
+      data: { position: { decrement: 1 } },
+    });
   }
 }

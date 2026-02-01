@@ -207,14 +207,51 @@ All routes support:
   chords?: Chord[]           // Expanded when fetched
   tags?: Tag[]               // Expanded when fetched
   is_favorite?: boolean      // When user is logged in
-  strumming_pattern?: {
-    strokes: StrokeType[]
-    tempo: number
-    noteLength: '1/4' | '1/8' | '1/8 triplet' | '1/16' | '1/16 triplet'
-    songPart?: string
-  }
+  strumming_pattern?: StrummingPattern
+  tablature?: SongTablature  // Guitar tablature data
+  capo?: number
+  links?: string[]
   user_id?: number
   created_at: string
+}
+```
+
+### SongTablature
+```typescript
+{
+  measures: TabMeasure[]     // Flat array of measures
+  tuning?: string[]          // e.g., ["E", "A", "D", "G", "B", "E"]
+}
+```
+
+### TabMeasure
+```typescript
+{
+  beats: TabBeat[]           // Beats in this measure
+  number?: number            // Measure number for display
+  timeSignature?: string     // e.g., "4/4" (only if changes)
+  tempo?: number             // BPM (only if changes)
+  section?: string           // Section name (e.g., "Verse 1")
+  instructions?: string[]    // e.g., ["let ring", "palm mute"]
+}
+```
+
+### TabBeat
+```typescript
+{
+  notes: TabNote[]           // Notes played simultaneously
+  duration: number           // 1=whole, 2=half, 4=quarter, 8=eighth, 16=sixteenth
+  chord?: string             // Chord name displayed above
+  lyric?: string             // Lyric syllable displayed below
+}
+```
+
+### TabNote
+```typescript
+{
+  string: number             // 0-5 (0=high E, 5=low E)
+  fret: number               // 0-24
+  technique?: 'h' | 'p' | '/' | '\\' | '~' | 'b' | 'r'
 }
 ```
 

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 export type LogLevel = 'info' | 'warn' | 'error';
 
@@ -26,7 +26,22 @@ export interface LogContext {
 
 @Injectable()
 export class LogsService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly prisma: PrismaService) {}
+
+  private toLogEntry(dbLog: any): LogEntry {
+    return {
+      id: dbLog.id,
+      level: dbLog.level as LogLevel,
+      action: dbLog.action,
+      message: dbLog.message,
+      user_id: dbLog.userId,
+      username: dbLog.username,
+      ip_address: dbLog.ipAddress,
+      user_agent: dbLog.userAgent,
+      metadata: dbLog.metadata as Record<string, any> | null,
+      created_at: dbLog.createdAt.toISOString(),
+    };
+  }
 
   async log(
     level: LogLevel,
@@ -35,20 +50,18 @@ export class LogsService {
     context?: LogContext,
   ): Promise<void> {
     try {
-      await this.db.query(
-        `INSERT INTO logs (level, action, message, user_id, username, ip_address, user_agent, metadata)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [
+      await this.prisma.log.create({
+        data: {
           level,
           action,
           message,
-          context?.userId || null,
-          context?.username || null,
-          context?.ipAddress || null,
-          context?.userAgent || null,
-          context?.metadata ? JSON.stringify(context.metadata) : null,
-        ],
-      );
+          userId: context?.userId || null,
+          username: context?.username || null,
+          ipAddress: context?.ipAddress || null,
+          userAgent: context?.userAgent || null,
+          metadata: context?.metadata || undefined,
+        },
+      });
     } catch (error) {
       // Don't let logging errors crash the app
       console.error('Failed to write log:', error);
@@ -73,48 +86,45 @@ export class LogsService {
     limit?: number;
     offset?: number;
   }): Promise<{ logs: LogEntry[]; total: number }> {
-    const conditions: string[] = [];
-    const params: any[] = [];
-    let paramIndex = 1;
+    const where: any = {};
 
     if (options?.level) {
-      conditions.push(`level = $${paramIndex++}`);
-      params.push(options.level);
+      where.level = options.level;
     }
 
     if (options?.action) {
-      conditions.push(`action ILIKE $${paramIndex++}`);
-      params.push(`%${options.action}%`);
+      where.action = { contains: options.action, mode: 'insensitive' };
     }
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-    // Get total count
-    const countResult = await this.db.query(
-      `SELECT COUNT(*) FROM logs ${whereClause}`,
-      params,
-    );
-    const total = parseInt(countResult.rows[0].count);
-
-    // Get logs with pagination
     const limit = options?.limit || 50;
     const offset = options?.offset || 0;
 
-    const result = await this.db.query(
-      `SELECT * FROM logs ${whereClause} ORDER BY created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`,
-      [...params, limit, offset],
-    );
+    const [logs, total] = await Promise.all([
+      this.prisma.log.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      this.prisma.log.count({ where }),
+    ]);
 
     return {
-      logs: result.rows,
+      logs: logs.map(this.toLogEntry),
       total,
     };
   }
 
   async clearOldLogs(daysToKeep: number = 30): Promise<number> {
-    const result = await this.db.query(
-      `DELETE FROM logs WHERE created_at < NOW() - INTERVAL '${daysToKeep} days'`,
-    );
-    return result.rowCount || 0;
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+
+    const result = await this.prisma.log.deleteMany({
+      where: {
+        createdAt: { lt: cutoffDate },
+      },
+    });
+
+    return result.count;
   }
 }

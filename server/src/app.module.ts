@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
-import { DatabaseModule } from './database/database.module';
+import { PrismaModule } from './prisma/prisma.module';
 import { ChordsModule } from './chords/chords.module';
 import { AuthModule } from './auth/auth.module';
 import { TagsModule } from './tags/tags.module';
@@ -10,7 +10,7 @@ import { ProgressModule } from './progress/progress.module';
 
 @Module({
   imports: [
-    DatabaseModule,
+    PrismaModule,
     LogsModule,
     ChordsModule,
     AuthModule,

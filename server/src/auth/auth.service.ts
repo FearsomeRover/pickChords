@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { DatabaseService } from '../database/database.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UpdateUsernameDto } from './dto/update-username.dto';
@@ -23,20 +23,28 @@ export interface JwtPayload {
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly db: DatabaseService,
+    private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
   ) {}
+
+  private toUser(dbUser: any): User {
+    return {
+      id: dbUser.id,
+      username: dbUser.username,
+      is_admin: dbUser.isAdmin || false,
+      created_at: dbUser.createdAt.toISOString(),
+    };
+  }
 
   async register(registerDto: RegisterDto): Promise<{ user: User; token: string }> {
     const { username, password } = registerDto;
 
     // Check if username already exists
-    const existing = await this.db.query(
-      'SELECT id FROM users WHERE username = $1',
-      [username]
-    );
+    const existing = await this.prisma.user.findUnique({
+      where: { username },
+    });
 
-    if (existing.rows.length > 0) {
+    if (existing) {
       throw new ConflictException('Username already exists');
     }
 
@@ -45,17 +53,14 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
     // Insert user
-    const result = await this.db.query(
-      'INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username, is_admin, created_at',
-      [username, passwordHash]
-    );
+    const dbUser = await this.prisma.user.create({
+      data: {
+        username,
+        passwordHash,
+      },
+    });
 
-    const user: User = {
-      id: result.rows[0].id,
-      username: result.rows[0].username,
-      is_admin: result.rows[0].is_admin || false,
-      created_at: result.rows[0].created_at,
-    };
+    const user = this.toUser(dbUser);
     const token = this.generateToken(user);
 
     return { user, token };
@@ -64,101 +69,84 @@ export class AuthService {
   async login(loginDto: LoginDto): Promise<{ user: User; token: string }> {
     const { username, password } = loginDto;
 
-    const result = await this.db.query(
-      'SELECT id, username, password_hash, is_admin, created_at FROM users WHERE username = $1',
-      [username]
-    );
+    const dbUser = await this.prisma.user.findUnique({
+      where: { username },
+    });
 
-    if (result.rows.length === 0) {
+    if (!dbUser) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const userRow = result.rows[0];
-    const isPasswordValid = await bcrypt.compare(password, userRow.password_hash);
+    const isPasswordValid = await bcrypt.compare(password, dbUser.passwordHash);
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const user: User = {
-      id: userRow.id,
-      username: userRow.username,
-      is_admin: userRow.is_admin || false,
-      created_at: userRow.created_at,
-    };
-
+    const user = this.toUser(dbUser);
     const token = this.generateToken(user);
 
     return { user, token };
   }
 
   async findById(id: number): Promise<User | null> {
-    const result = await this.db.query(
-      'SELECT id, username, is_admin, created_at FROM users WHERE id = $1',
-      [id]
-    );
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id },
+    });
 
-    if (result.rows.length === 0) return null;
+    if (!dbUser) return null;
 
-    return {
-      id: result.rows[0].id,
-      username: result.rows[0].username,
-      is_admin: result.rows[0].is_admin || false,
-      created_at: result.rows[0].created_at,
-    };
+    return this.toUser(dbUser);
   }
 
   async updateUsername(userId: number, dto: UpdateUsernameDto): Promise<{ user: User; token: string }> {
     const { newUsername } = dto;
 
     // Check if new username already exists (by another user)
-    const existing = await this.db.query(
-      'SELECT id FROM users WHERE username = $1 AND id != $2',
-      [newUsername, userId]
-    );
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        username: newUsername,
+        NOT: { id: userId },
+      },
+    });
 
-    if (existing.rows.length > 0) {
+    if (existing) {
       throw new ConflictException('Username already taken');
     }
 
     // Update username
-    const result = await this.db.query(
-      'UPDATE users SET username = $1 WHERE id = $2 RETURNING id, username, is_admin, created_at',
-      [newUsername, userId]
-    );
+    try {
+      const dbUser = await this.prisma.user.update({
+        where: { id: userId },
+        data: { username: newUsername },
+      });
 
-    if (result.rows.length === 0) {
-      throw new BadRequestException('User not found');
+      const user = this.toUser(dbUser);
+      const token = this.generateToken(user);
+
+      return { user, token };
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        throw new BadRequestException('User not found');
+      }
+      throw error;
     }
-
-    const user: User = {
-      id: result.rows[0].id,
-      username: result.rows[0].username,
-      is_admin: result.rows[0].is_admin || false,
-      created_at: result.rows[0].created_at,
-    };
-
-    // Generate new token with updated username
-    const token = this.generateToken(user);
-
-    return { user, token };
   }
 
   async updatePassword(userId: number, dto: UpdatePasswordDto): Promise<void> {
     const { currentPassword, newPassword } = dto;
 
     // Get current password hash
-    const result = await this.db.query(
-      'SELECT password_hash FROM users WHERE id = $1',
-      [userId]
-    );
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
 
-    if (result.rows.length === 0) {
+    if (!dbUser) {
       throw new BadRequestException('User not found');
     }
 
     // Verify current password
-    const isPasswordValid = await bcrypt.compare(currentPassword, result.rows[0].password_hash);
+    const isPasswordValid = await bcrypt.compare(currentPassword, dbUser.passwordHash);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Current password is incorrect');
     }
@@ -168,10 +156,10 @@ export class AuthService {
     const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
 
     // Update password
-    await this.db.query(
-      'UPDATE users SET password_hash = $1 WHERE id = $2',
-      [newPasswordHash, userId]
-    );
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newPasswordHash },
+    });
   }
 
   private generateToken(user: User): string {
