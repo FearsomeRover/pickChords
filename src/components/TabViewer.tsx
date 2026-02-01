@@ -78,6 +78,8 @@ export default function TabViewer({ tablature, title, artist }: TabViewerProps) 
       const settings = new alphaTab.Settings()
       settings.core.tex = true
       settings.core.engine = 'svg'
+      // Font directory - use base URL for fonts (alphaTab vite plugin handles this)
+      settings.core.fontDirectory = import.meta.env.BASE_URL + 'font/'
 
       // Display settings
       settings.display.scale = 1.0

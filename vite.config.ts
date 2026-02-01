@@ -4,6 +4,10 @@ import tailwindcss from '@tailwindcss/vite'
 import { alphaTab } from '@coderline/alphatab-vite'
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), alphaTab()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    alphaTab()
+  ],
   base: process.env.BASE_PATH || '/',
 })
